@@ -863,8 +863,17 @@ lands in this exact format at the top of the front's dossier
 | fuzzy / new ground | superpowers:brainstorming if installed, else the 3 questions below |
 | clear + big | superpowers:writing-plans if installed, else a plan section in the dossier |
 | clear + small | no shaping — write the BRIEF directly |
+| knowledge gap | `workflow.tools.research` if configured (feynman-style deep research, GSD-style research phase); else native: web search → grade sources → findings note |
 
 `workflow.tools` in `.claude/orch.json` overrides the defaults.
+
+**Research route (optional):** before writing the BRIEF ask — does this
+goal depend on facts the AI can neither derive from the repo nor verify
+from training (post-cutoff APIs, niche domain facts, papers, vendor
+specifics)? If yes, run the research pass first; its output lands as a
+`research:` section in the dossier (sources cited, confidence graded) and
+the BRIEF cites it. If no, skip — research is a route, never a mandatory
+phase.
 
 Native fallback — exactly three questions, one at a time:
 1. What number (or observable) tells us this worked?

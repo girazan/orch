@@ -197,6 +197,11 @@ frame: intent and judgment from the human, judgment and labor from the
 machines, and a written map of who's specialized in what — the map is the
 contract.
 
+One added premise bullet: AI judges well but hasn't learned everything —
+when a goal depends on facts outside both the repo and the model's
+training, an optional research pass (cited, confidence-graded) runs before
+the work, so the plan stands on sources, not confident guesses.
+
 Then: the seven premises condensed, the contract JSON, the 3 commands
 (`/orch:setup`, `/orch:goal`, `/orch:go`), records, the seven-hook table,
 configure, glossary. Plain-language register retained. Enforcement stated
@@ -239,7 +244,19 @@ shaping tool is routed by `/orch:goal`, not re-decided per task:
 | fuzzy / new ground | `superpowers:brainstorming` | orch's native brief ritual (template + 3 shaping questions) |
 | clear + big | `superpowers:writing-plans` | native plan section |
 | clear + small | skip shaping, route directly | — |
+| knowledge gap (see below) | research tool from `workflow.tools.research` (e.g. a feynman-style deep-research agent or a GSD-style research phase) | native research pass: web search + source-grade + findings note |
 | human names a tool | that tool — per-task override always wins | — |
+
+**Research route (OPTIONAL, knowledge-gap triggered):** models judge well
+but haven't learned everything — post-cutoff APIs, niche domain facts,
+papers, vendor specifics. At `/orch:goal` time (and again at route time if
+work surfaces one), test: does this goal depend on facts the AI can
+neither derive from the repo nor verify from training? If yes, run a
+research pass FIRST; its output lands as a `research:` section in the
+dossier (sources cited, confidence graded), and the BRIEF's `goal:`/
+`done:` lines cite it. If no, skip — research is a route, never a
+mandatory phase. Authored values without a cited source remain
+never-delegated regardless.
 
 Optional `workflow.tools` map in orch.json overrides defaults. Whatever
 tool runs, its output lands as the BRIEF at the top of the front's dossier.
