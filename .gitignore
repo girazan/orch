@@ -1,2 +1,3 @@
 tests/scratch-*/
 .claude/
+docs/*.visual-check.*
