@@ -124,7 +124,7 @@ preflight (loop.md), handoff/session-end + hook-wall summary (bare, go.md).
 ## §5 README reframe
 
 Rewritten around the operator's seven premises; opens with "you decide once
-what the AI may decide"; the contract is the front door, the 7 commands are
+what the AI may decide"; the contract is the front door, the 3 commands are
 the daily surface, ladder/gates/hooks presented as the machinery enforcing
 it. Plain-language register and glossary retained.
 
