@@ -1,7 +1,7 @@
 # orch v0.3.0 — The Decision Contract
 
 Date: 2026-08-28 · Status: approved by operator (sectioned review in-session,
-rev 2: skill split into 7 commands)
+rev 3: 3 commands + orch-decided internal phases)
 
 ## Premise
 
@@ -86,33 +86,40 @@ Learn-loop: change matches no domain (or domains conflict) → work parks
 amendment (proposed domain, paths, expertise, decide/ship, rationale). Human
 accepts the ADR via `/orch:setup` → contract edited → version bumped.
 
-## §4 Skill family — seven commands, progressive disclosure
+## §4 Skill surface — three commands, orch-decided phases
 
-The monolithic `skills/orch/SKILL.md` becomes seven small skills under
-`skills/`, each loading only its slice. Roles framing throughout: frontier AI
-orchestrates, plans, reviews, gates; suited cheap AI executes; shipping per
-contract.
+Human-facing commands are exactly the human moments; the workflow phases are
+internal states bare `/orch` walks itself, loading per-phase files on demand
+(the herdr.md progressive-disclosure pattern). Roles framing throughout:
+frontier AI orchestrates, plans, reviews, gates; suited cheap AI executes;
+shipping per contract.
 
-| Command | Loads | When |
+| Command | Does | When |
 |---|---|---|
-| `/orch` (bare) | board + unratified ADRs + parked items → proposes next command | session start; "where are we" anytime. ≤5 lines out. The dispatcher: tells the user which command is next. |
 | `/orch:setup` | onboarding ritual: write/edit contract domains, lock file, `workflow.tools`; ratify/reject proposed ADRs | first install on a repo; contract governance |
 | `/orch:goal` | brief ritual (goal · metric · done-condition · domains touched · kill criteria) + shaping route (§7) | new front, or editing a front's goal/metric |
-| `/orch:route` | classify change → domain → decide/ship + tool pick; ends at operator approval, never starts work | before work starts |
-| `/orch:go` | roles, delegation, review ladder (incl. empty-result gate + tri-state verdicts), record discipline | after route agreed — the heavy one |
-| `/orch:ship` | 3-leg merge gate + contract ship check + audit line | work done, wants to land |
-| `/orch:loop` | 5-check preflight + launch journal | before any autonomous run |
+| `/orch` (bare) | reads board + dossier artifacts + unratified ADRs → decides the current phase → acts → reports ≤5 lines + what's next | the session driver — everything after goal definition |
 
-Chain enforced by artifacts, not memory: `:goal` writes the brief → `:route`
-requires a brief and writes a `ROUTE:` line → `:go` requires the `ROUTE:`
-line → `:ship` requires ledger evidence. Each command checks its
-predecessor's artifact and refuses (with the pointer) if missing — skipped
-steps are visible, never silent.
+Phase files under `skills/orch/`, loaded ONLY when bare `/orch` enters that
+phase (SKILL.md itself stays a thin state machine):
 
-Carried over unchanged from v0.2.0 into the relevant commands: board
-vocabulary incl. needs_attention + evidence-before-done (bare, :ship),
-review ladder + stall rule (:go), merge gate + noise clause (:ship),
-preflight (:loop), handoff/session-end + hook-wall summary (bare, :go).
+| Phase file | Loaded when | Content |
+|---|---|---|
+| `route.md` | front has BRIEF but no `ROUTE:` line | classify change → domain → decide/ship + tool pick; STOPS at operator approval when the domain requires it |
+| `go.md` | routed, work not complete | delegation, review ladder (incl. empty-result gate + tri-state verdicts), record discipline |
+| `ship.md` | ledger evidence ready | 3-leg merge gate + contract ship check + audit line |
+| `loop.md` | operator asks for an autonomous run | 5-check preflight + launch journal — always a PROPOSAL the operator approves; preflight unskippable |
+
+Chain enforced by artifacts, not memory: `:goal` writes the brief → route
+phase requires a brief and writes a `ROUTE:` line → go phase requires the
+`ROUTE:` line → ship phase requires ledger evidence. Bare `/orch` refuses to
+advance past a missing artifact and points back — skipped steps are visible,
+never silent.
+
+Carried over unchanged from v0.2.0 into the relevant surfaces: board
+vocabulary incl. needs_attention + evidence-before-done (bare, ship.md),
+review ladder + stall rule (go.md), merge gate + noise clause (ship.md),
+preflight (loop.md), handoff/session-end + hook-wall summary (bare, go.md).
 
 ## §5 README reframe
 
@@ -128,8 +135,8 @@ it. Plain-language register and glossary retained.
   no-contract no-op, lock-file overriding a domain, audit-line written on
   allow and block, contract-hash-change line, no-upstream push resolution.
 - Regression: existing 7-case lock matrix + 12-case hook matrix stay green.
-- Skill-chain check (manual): each command refuses cleanly when its
-  predecessor artifact is missing.
+- Skill-chain check (manual): bare `/orch` refuses cleanly to enter a phase
+  whose predecessor artifact is missing, and points back.
 
 ## §7 Workflow layer — Brief → Front → Iterations
 
@@ -155,7 +162,8 @@ lines) → done-condition or kill.
 | `hooks/contract-ship-gate.js` | NEW (~120 ln) |
 | `hooks/hooks.json` | +1 wiring |
 | `hooks/lib/config.js` | + audit append helper |
-| `skills/orch/SKILL.md` | becomes the bare dispatcher (thin) |
-| `skills/{setup,goal,route,go,ship,loop}/SKILL.md` | NEW ×6, split from monolith |
-| `README.md` | rewritten around the premises + 7 commands |
+| `skills/orch/SKILL.md` | becomes the thin state machine (bare `/orch`) |
+| `skills/orch/{route,go,ship,loop}.md` | NEW ×4, phase files loaded on demand |
+| `skills/{setup,goal}/SKILL.md` | NEW ×2, the other human-facing commands |
+| `README.md` | rewritten around the premises + 3 commands |
 | `.claude-plugin/plugin.json` | 0.3.0 |
