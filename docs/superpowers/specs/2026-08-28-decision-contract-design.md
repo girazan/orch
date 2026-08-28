@@ -1,7 +1,7 @@
 # orch v0.3.0 — The Decision Contract
 
-Date: 2026-08-28 · Status: approved by operator (sectioned review in-session,
-rev 3: 3 commands + orch-decided internal phases)
+Date: 2026-08-28 · Status: approved rev 3; rev 4 incorporates dual-review
+findings (Codex-Sol + Opus, both FAIL verdicts, all confirmed findings fixed)
 
 ## Premise
 
@@ -14,8 +14,10 @@ hooks.
 
 ## §1 Contract schema
 
-`.claude/orch.json`, new `contract` block (protected by the existing
-`~/.claude/orch-lock.json` deep-override):
+`.claude/orch.json`, new `contract` block. **Security note:** the project
+file is agent-writable; for guarantees against self-loosening, `/orch:setup`
+offers to mirror the contract into `~/.claude/orch-lock.json`, which
+deep-overrides the project copy (existing lock mechanism — lock always wins).
 
 ```json
 "contract": {
@@ -23,125 +25,195 @@ hooks.
   "domains": {
     "numerics": { "paths": ["src/Solver/**", "src/Kernel/**"],
                   "expertise": "process physics, conservation, units — operator's specialty",
-                  "decide": "human",          "ship": "none"   },
+                  "decide": "human", "ship": "none"   },
     "web-ui":   { "paths": ["src/Hmi.Web/**"],
                   "expertise": "standard web patterns, no domain physics",
-                  "decide": "ai",             "ship": "push"   },
+                  "decide": "ai",    "ship": "push"   },
     "tests":    { "paths": ["tests/**"],
-                  "decide": "ai_with_ruling", "ship": "commit" }
+                  "decide": "ai",    "ship": "commit" }
   }
 }
 ```
 
-- Domains are expertise territories, not risk tiers. `expertise` is read by
-  the AI to classify ambiguous changes: semantics over globs when they
-  conflict ("touches web-ui paths but changes a setpoint calc → numerics").
-- `decide`: `ai` | `ai_with_ruling` | `human`.
-- `ship`: `push` ⊃ `merge` ⊃ `commit` ⊃ `none` (each grant implies the weaker).
-- Multi-match → strictest wins. No match / conflict → strictest (human/none)
-  AND the learn-loop fires (§3). No configurable default — omission never
-  grants.
+- Domains are expertise territories, not risk tiers.
+- `decide`: `ai` | `human`. There is no middle value: EVERY autonomous
+  decision of consequence requires a `Ruling:` line (record discipline),
+  so "ai with ruling" is the only kind of `ai` there is.
+- `ship`: `push` ⊃ `commit` ⊃ `none` (each grant implies the weaker). There
+  is no `merge` grant — a merge you cannot push is inert, and merge/rebase
+  machinery is where gate bypasses live; history-rewriting commands are
+  blocked outright (§2).
+- Multi-match → strictest wins, on both axes (`human` beats `ai`; lower ship
+  rank beats higher). No match / conflict → strictest (human/none) AND the
+  learn-loop fires (§3). No configurable default — omission never grants.
+- **Enforcement boundary (stated honestly):** the hook enforces the PATH
+  axis deterministically. The `expertise` text binds the AI's own routing
+  judgment (semantics over globs when they conflict) — that is skill-layer
+  defense in depth, not hardware; the hook never claims to read semantics.
 - INCONCLUSIVE review/merge verdicts always go to the human regardless of
   domain.
 
 ## §2 Ship-gate hook
 
 New `hooks/contract-ship-gate.js`, PreToolUse on Bash|PowerShell, wired in
-`hooks/hooks.json` alongside (not inside) `block-destructive-git`.
+`hooks/hooks.json` alongside `block-destructive-git`.
 
-- Detects `git commit` / `git push` / `git merge` (incl. `git.exe`, `-C`,
-  global opts — same segment-matching style as block-destructive-git).
-- Resolves touched files: commit → `git diff --cached --name-only`; push →
-  `git diff @{u}..HEAD --name-only` (no upstream → all commits on branch);
-  merge → `git diff <target>...HEAD --name-only` of the merged ref.
-- Maps every file to matching domain(s); strictest grant across ALL files
-  governs. Action exceeds grant → exit 2, message names files, domain, and
-  who ships ("numerics grants none — operator ships this").
-- Fail CLOSED: unresolvable file list, corrupt contract JSON, oversized
-  (>1MB) payload. No `contract` block configured → no-op (v0.2.0 installs
-  unaffected).
-- Every decision (ALLOW and BLOCK) appends an audit line (§3).
+**Command classification — per SEGMENT, strictest across the whole line:**
+split the command on `|`, `;`, `&`, newline; classify every segment; the
+required grant is the MAX action rank found in ANY segment (`git commit &&
+git push` requires push). `git`/`git.exe` with `-C`, `--git-dir`,
+`--work-tree`, or a `GIT_DIR=`/`GIT_WORK_TREE=` env prefix in the segment →
+fail CLOSED (the hook gates exactly one repo: the session's; re-targeting is
+the operator's move).
+
+**Gated actions (only two, resolved precisely):**
+- `commit` → files = staged (`diff --cached --name-only`); `-a`/`--all` or a
+  pathspec/`--only`/`--include`/`--interactive`/`--patch` → union with
+  unstaged tracked changes (`diff --name-only`) — a strict superset errs
+  closed; `--amend` → union with `diff HEAD^ HEAD --name-only`.
+- `push` → allowed grammar is narrow: plain `git push`, `git push <remote>`,
+  `git push [-u] <remote> <current-branch>`. Files = `git diff <base>..HEAD
+  --name-only` (diff, never log — log is empty for merge commits) where
+  `<base>` = `@{push}` → `@{u}` → merge-base with the remote default branch.
+  No remote/base resolvable → fail CLOSED (first push is the operator's).
+  Refspecs (`a:b`), `--all`, `--mirror`, `--tags`, `--delete`, `--force*` →
+  fail CLOSED.
+
+**Blocked outright when a contract exists** (history writers and remote
+ships whose file-sets can't be resolved safely): `git merge` (incl.
+`--continue`), `rebase`, `cherry-pick`, `revert`, `am`, `gh pr merge`.
+Message: operator runs it, or a contract amendment (ADR) grants a
+workflow that needs it.
+
+**Fail-closed inventory (all exit 2, all audited):** oversized payload ·
+`.claude/orch.json` exists but is unparseable (corrupt config must never
+silently disable the gate) · contract present but invalid (schema check
+uses own-property lookups — `"ship":"toString"` is invalid, enums exact) ·
+unresolvable file list · **empty resolved file list** (`--allow-empty` and
+friends mutate history filelessly; git itself refuses true no-ops, so
+blocking empties costs nothing and closes the hole) · blocked-command list
+above. No `contract` block in a parseable config → no-op (exit 0), so
+pre-contract installs are unaffected.
+
+**Mechanics:** repo root discovered via `git rev-parse --show-toplevel`
+from `j.cwd` (config + globs are root-relative; monorepo subdir sessions
+still find the contract); all git calls use `-c core.quotePath=false`
+(non-ASCII paths must match globs, not their escaped quoting); the
+configured audit file itself is always-granted (evidence writing can never
+deadlock the gate that writes it); strictest grant across all files
+governs; the governing domain is tracked independently of rank so ALLOW
+audit lines always name it.
 
 ## §3 Decision records — one system, three depths
 
 | Depth | Artifact | When |
 |---|---|---|
-| audit line | `.claude/orch-audit.jsonl` (path configurable, git-tracked) | every ship-gate call: `{ts, action, files, domain, verdict, by:"hook"}`; skill mirrors Rulings as `{by:"ruling"}` lines |
-| `Ruling:` line | front's dossier + audit mirror | small autonomous call inside one front (decision · why · cost if wrong) |
-| ADR | `docs/adr/NNNN-<slug>.md` | anything shaping structure, contracts, or future decisions — including contract amendments |
+| audit line | `.claude/orch-audit.jsonl` (path configurable; local-first — gitignoring `.claude/` is fine; if tracked, the file is gate-exempt per §2) | EVERY ship-gate exit — ALLOW, BLOCK, and every fail-closed path — `{ts, action, files, domain, verdict, reason?, by:"hook"}`; the skill mirrors Rulings as `{by:"ruling"}` lines |
+| `Ruling:` line | front's dossier + audit mirror | every autonomous decision of consequence: `Ruling: <decision> — <why> — <cost if wrong>` |
+| ADR | `docs/adr/NNNN-<slug>.md`, header `Status: proposed | accepted | rejected | superseded` | anything shaping structure, contracts, or future decisions — including every contract amendment |
 
 ADR authorship and status:
-- Pair mode (human + AI decide together) → `status: accepted` on write.
-- Autopilot (AI alone) → ALWAYS `status: proposed`; unratified ADRs surface
-  in bare `/orch`; human ratifies (→ accepted) or rejects via `/orch:setup`.
-  The plugin never edits its own contract.
+- Pair mode (human + AI decide together) → `Status: accepted` on write.
+- Autopilot (AI alone) → ALWAYS `Status: proposed`; unratified ADRs surface
+  in `/orch:go`'s session report; human ratifies (accepted), rejects
+  (rejected), or replaces later (superseded) via `/orch:setup`. The plugin
+  never edits its own contract.
 
-Contract versioning: the ship-gate keeps a hash of the contract block in temp
-state; on change it writes a `contract_changed` audit line with old→new
-`version`. An edit without a version bump is flagged in the audit line, not
-blocked (the editor may be the human).
+Contract history: `git log -p .claude/orch.json` IS the change record —
+no hash/tmp-state machinery. Convention: every contract edit bumps
+`version` and cites an ADR; `/orch:setup` enforces the convention at
+edit time.
 
-Learn-loop: change matches no domain (or domains conflict) → work parks
-(strictest) AND the AI writes a proposed ADR containing a ready-to-paste
-amendment (proposed domain, paths, expertise, decide/ship, rationale). Human
-accepts the ADR via `/orch:setup` → contract edited → version bumped.
+Learn-loop — fires from EVERY unmatched/conflicting classification, both
+skill-side (route time) and hook-side (a ship-gate BLOCK naming
+`unmatched`): work parks (strictest) AND the AI writes a proposed ADR with
+a ready-to-paste amendment (domain, paths, expertise, decide/ship,
+rationale). Human accepts via `/orch:setup` → contract edited → version
+bumped.
 
 ## §4 Skill surface — three commands, orch-decided phases
 
-Human-facing commands are exactly the human moments; the workflow phases are
-internal states bare `/orch` walks itself, loading per-phase files on demand
-(the herdr.md progressive-disclosure pattern). Roles framing throughout:
-frontier AI orchestrates, plans, reviews, gates; suited cheap AI executes;
-shipping per contract.
+Plugin skills always namespace as `orch:<name>` (there is no bare `/orch` —
+`ponytail:ponytail` precedent), so the driver is **`/orch:go`**:
 
 | Command | Does | When |
 |---|---|---|
-| `/orch:setup` | onboarding ritual: write/edit contract domains, lock file, `workflow.tools`; ratify/reject proposed ADRs | first install on a repo; contract governance |
+| `/orch:setup` | onboarding ritual: write/edit contract domains (offer lock-file mirroring), `workflow.tools`; ratify/reject proposed ADRs; every contract edit bumps version + cites an ADR | first install on a repo; contract governance |
 | `/orch:goal` | brief ritual (goal · metric · done-condition · domains touched · kill criteria) + shaping route (§7) | new front, or editing a front's goal/metric |
-| `/orch` (bare) | reads board + dossier artifacts + unratified ADRs → decides the current phase → acts → reports ≤5 lines + what's next | the session driver — everything after goal definition |
+| `/orch:go` | reads board + dossier + proposed ADRs → decides the current phase by ORDERED precedence → acts → reports ≤5 lines + what's next | the session driver — everything after goal definition |
 
-Phase files under `skills/orch/`, loaded ONLY when bare `/orch` enters that
-phase (SKILL.md itself stays a thin state machine):
+`skills/go/SKILL.md` holds the state machine AND the two thin phases
+(route, ship) inline; only the heavy phases load on demand:
 
-| Phase file | Loaded when | Content |
+| Phase | Precedence (first match wins) | Where |
 |---|---|---|
-| `route.md` | front has BRIEF but no `ROUTE:` line | classify change → domain → decide/ship + tool pick; STOPS at operator approval when the domain requires it |
-| `go.md` | routed, work not complete | delegation, review ladder (incl. empty-result gate + tri-state verdicts), record discipline |
-| `ship.md` | ledger evidence ready | 3-leg merge gate + contract ship check + audit line |
-| `loop.md` | operator asks for an autonomous run | 5-check preflight + launch journal — always a PROPOSAL the operator approves; preflight unskippable |
+| loop | operator's current message asks for an autonomous run (explicit input, the one non-artifact trigger) | `loop.md` |
+| closed | board row `merged` → report and stop; a shipped front never re-enters ship | inline |
+| route | BRIEF exists, no `ROUTE:` line | inline |
+| work | `ROUTE:` line exists, done-condition not yet evidenced in ledger | `work.md` |
+| ship | ledger lines satisfy the BRIEF's done-condition | inline |
+| (none) | no front / no BRIEF → point to `/orch:goal`, stop | inline |
 
-Chain enforced by artifacts, not memory: `:goal` writes the brief → route
-phase requires a brief and writes a `ROUTE:` line → go phase requires the
-`ROUTE:` line → ship phase requires ledger evidence. Bare `/orch` refuses to
-advance past a missing artifact and points back — skipped steps are visible,
-never silent.
+Canonical artifact grammar (single source — every reader/writer uses it
+verbatim):
+- BRIEF (dossier header): `goal:` `metric:` `done:` `domains:` `kill:`
+- `ROUTE: <domain> · decide:<ai|human> · ship:<none|commit|push> ·
+  tier:<model-tier> · approved:<operator|auto> · <date>` — for
+  `decide: human`, the line is written ONLY after operator approval
+  (`approved:operator`); the approval artifact IS the ROUTE line.
+- Ledger: `iter <n> · <short-sha> · <before> → <after> ·
+  keep|revert|flat|refuted · <what>` · `Ruling: <decision> — <why> —
+  <cost if wrong>`
+- ADR header: `Status: proposed|accepted|rejected|superseded`
 
-Carried over unchanged from v0.2.0 into the relevant surfaces: board
-vocabulary incl. needs_attention + evidence-before-done (bare, ship.md),
-review ladder + stall rule (go.md), merge gate + noise clause (ship.md),
-preflight (loop.md), handoff/session-end + hook-wall summary (bare, go.md).
+Chain: BRIEF → ROUTE: → ledger evidence → ship. `/orch:go` refuses to
+advance past a missing artifact and points back.
+
+Carried over unchanged from v0.2.0: board vocabulary incl. needs_attention
++ evidence-before-done, review ladder (empty-result gate, tri-state
+verdicts, identity-based stall), merge gate + noise clause, preflight,
+handoff/session-end.
 
 ## §5 README reframe
 
 Rewritten around the operator's seven premises; opens with "you decide once
-what the AI may decide"; the contract is the front door, the 3 commands are
-the daily surface, ladder/gates/hooks presented as the machinery enforcing
-it. Plain-language register and glossary retained.
+what the AI may decide"; the contract is the front door, the 3 commands
+(`/orch:setup`, `/orch:goal`, `/orch:go`) are the daily surface,
+ladder/gates/hooks the machinery. Plain-language register and glossary
+retained. The enforcement claim is stated honestly: the hook wall gates
+this repo's git commit/push and blocks history-rewriters; it is not a
+sandbox.
 
 ## §6 Tests
 
-- Ship-gate matrix (~14): allow/deny per action, implied-grant chain,
-  strictest-wins multi-domain, no-match denial, corrupt contract fail-closed,
-  no-contract no-op, lock-file overriding a domain, audit-line written on
-  allow and block, contract-hash-change line, no-upstream push resolution.
-- Regression: existing 7-case lock matrix + 12-case hook matrix stay green.
-- Skill-chain check (manual): bare `/orch` refuses cleanly to enter a phase
-  whose predecessor artifact is missing, and points back.
+Ship-gate matrix (~30): per-segment strictest (`commit && push`) · allow/
+deny per action · implied grant (push⊃commit) · strictest-wins multi-domain
+· unmatched denial · nested `**/*.md` + anchoring (`docs2/` misses
+`docs/**`) · corrupt orch.json fail-closed · invalid enum (incl.
+`"toString"`) fail-closed · empty-domains no-op vs no-contract no-op ·
+`-C`/`--git-dir`/`GIT_DIR=` fail-closed · refspec/`--all`/`--mirror`/
+`--tags`/`--delete` fail-closed · blocked-command list (merge, rebase,
+cherry-pick, gh pr merge) · `--allow-empty` blocked · `commit -a` union ·
+pathspec-commit superset · `--amend` union · push via merge-base (merge
+commit contents included; diff-not-log) · no-remote fail-closed · governing
+domain named on all-push ALLOW · audit line on every exit incl. die paths ·
+audit-file self-exemption · lock-file domain override · oversized payload.
+Test harness: `commit.gpgsign=false` + `core.autocrlf=false` set in scratch
+repos; scratch dirs gitignored; teardown chmods `.git` objects before rm
+(Windows EPERM).
+
+Regression: lock matrix (ported into `tests/`) + destructive-git smoke
+(in `tests/`) stay green. Wiring test asserts the ship-gate entry exists in
+`hooks.json`'s PreToolUse Bash|PowerShell group with correct command path.
+
+Skill-chain check (manual): `/orch:go` phase precedence walks correctly for
+(a) no BRIEF (b) BRIEF only (c) BRIEF+ROUTE (d) evidence-complete
+(e) board-merged; each refusal points backward.
 
 ## §7 Workflow layer — Brief → Front → Iterations
 
-Continuous flow, no timeboxes. The BRIEF format is the interface; the shaping
-tool is routed by `/orch:goal`, not re-decided per task:
+Continuous flow, no timeboxes. The BRIEF format is the interface; the
+shaping tool is routed by `/orch:goal`, not re-decided per task:
 
 | Task shape | Default tool | Fallback |
 |---|---|---|
@@ -150,20 +222,22 @@ tool is routed by `/orch:goal`, not re-decided per task:
 | clear + small | skip shaping, route directly | — |
 | human names a tool | that tool — per-task override always wins | — |
 
-Optional `workflow.tools` map in orch.json overrides defaults (e.g. for Matt
-Pocock-style plugins). Whatever tool runs, its output lands as the BRIEF at
-the top of the front's dossier. Then: front on BOARD.md → iterations (ledger
-lines) → done-condition or kill.
+Optional `workflow.tools` map in orch.json overrides defaults. Whatever
+tool runs, its output lands as the BRIEF at the top of the front's dossier.
+Then: front on BOARD.md → iterations (ledger lines) → done-condition or
+kill.
 
 ## Files touched
 
 | File | Change |
 |---|---|
-| `hooks/contract-ship-gate.js` | NEW (~120 ln) |
+| `hooks/contract-ship-gate.js` | NEW (~150 ln) |
 | `hooks/hooks.json` | +1 wiring |
-| `hooks/lib/config.js` | + audit append helper |
-| `skills/orch/SKILL.md` | becomes the thin state machine (bare `/orch`) |
-| `skills/orch/{route,go,ship,loop}.md` | NEW ×4, phase files loaded on demand |
-| `skills/{setup,goal}/SKILL.md` | NEW ×2, the other human-facing commands |
+| `hooks/lib/config.js` | + audit append helper + corrupt-config signal |
+| `skills/orch/` | REMOVED (renamed) |
+| `skills/go/SKILL.md` | NEW — driver: state machine + route/ship inline |
+| `skills/go/{work,loop}.md` | NEW ×2, heavy phases on demand |
+| `skills/{setup,goal}/SKILL.md` | NEW ×2 |
+| `tests/` | NEW in-repo: audit, ship-gate, lock (ported), destructive-git smoke |
 | `README.md` | rewritten around the premises + 3 commands |
 | `.claude-plugin/plugin.json` | 0.3.0 |
