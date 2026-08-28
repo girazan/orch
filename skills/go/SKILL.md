@@ -16,7 +16,7 @@ judgment, verdict-only; suited cheap models execute.
 
 ## On every invocation
 
-1. Read: BOARD.md · the active front's dossier · `docs/adr/` for
+1. Read: `docs/BOARD.md` · the active front's dossier · `docs/adr/` for
    `Status: proposed` · the contract.
 2. Report ≤5 lines: front, phase, blockers, unratified ADRs, parked items.
 3. Decide the phase — ORDERED, first match wins:
@@ -32,6 +32,22 @@ judgment, verdict-only; suited cheap models execute.
 
 Never advance past a missing artifact — refuse and point back. Skipped
 steps are visible, never silent.
+
+## The board
+
+Canonical file: `docs/BOARD.md` — git-tracked. Edit the row and COMMIT it
+whenever a front's status or blocker changes: an uncommitted board edit is
+an unrecorded one, and `git log` on the file is the campaign journal.
+
+Status vocabulary: **ready** (shaped, unowned) · **running** · **review**
+(in the review ladder) · **blocked** (MUST name the blocker AND who owns
+unblocking it) · **needs_attention** (work ended without evidence — see
+phase: ship) · **merged**.
+
+Board-theater rule: a front sitting blocked for more than a session with no
+named unblock-owner is board theater — surface it, don't recite past it.
+
+Detail lives in dossiers, never the board.
 
 ## The contract
 

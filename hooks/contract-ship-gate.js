@@ -101,7 +101,7 @@ function classify(command) {
     if (READ_ALLOW.has(sub)) continue; // -C/--git-dir on a read op is harmless
     if (retargetFlag) res.retarget = true;
     if (sub === 'commit') {
-      const amend = seg.slice(subIdx + 1).some(tok => !tok.quoted && tok.text === '--amend');
+      const amend = seg.slice(subIdx + 1).some(tok => !tok.quoted && tok.text.startsWith('--am'));
       if (amend) res.denied = res.denied || 'git commit --amend'; // no amend-union path — operator only
       else res.action = Math.max(res.action, 1);
     } else if (sub === 'push') {
@@ -124,7 +124,7 @@ function git(cwdArg, args) {
   // message (ours) — a git subprocess's own stderr is captured, never
   // inherited onto the terminal.
   return execFileSync('git', ['-C', cwdArg, '-c', 'core.quotePath=false', ...args],
-    { timeout: 5000, stdio: ['ignore', 'pipe', 'pipe'] }).toString();
+    { timeout: 5000, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }).toString();
 }
 
 const cwd = (j && j.cwd) || process.cwd();

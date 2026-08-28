@@ -259,6 +259,9 @@ g('push');
 check('54. commit --allow-empty on clean tree -> 2 (empty set)', run('git commit --allow-empty -m x').code === 2);
 
 check('55. commit --amend -> 2, denied (no amend-union path)', run('git commit --amend -m x').code === 2);
+check('commit --am -m x -> 2, denied (unambiguous abbreviation)', run('git commit --am -m x').code === 2);
+check('commit --ame -m x -> 2, denied (unambiguous abbreviation)', run('git commit --ame -m x').code === 2);
+check('commit --amen -m x -> 2, denied (unambiguous abbreviation)', run('git commit --amen -m x').code === 2);
 
 // ===================================================== MERGE-COMMIT PUSH (diff-not-log)
 g('checkout', '-b', 'feature-merge');

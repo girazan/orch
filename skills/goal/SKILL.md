@@ -45,7 +45,7 @@ Native fallback — exactly three questions, one at a time:
 
 ## Register
 
-Add the front's row to BOARD.md (status: ready) and commit the board
+Add the front's row to `docs/BOARD.md` (status: ready) and commit the board
 edit. Classify the `domains:` line against the contract now — if any part
 is `decide: human`, tell the operator where they will be needed. Then
 hand to `/orch:go` (phase: route).
