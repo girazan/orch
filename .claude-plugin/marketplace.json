@@ -1,0 +1,11 @@
+{
+  "name": "orch",
+  "owner": { "name": "girazan" },
+  "plugins": [
+    {
+      "name": "orch",
+      "source": "./",
+      "description": "Evidence-gated orchestration: hook wall, review ladder, merge gate, loop preflight."
+    }
+  ]
+}

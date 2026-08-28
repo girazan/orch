@@ -1,0 +1,6 @@
+{
+  "name": "orch",
+  "version": "0.1.0",
+  "description": "Evidence-gated orchestration for Claude Code: a deterministic hook wall (destructive-op blocks, protected dirs, fact-force gate, session hygiene, context alarms), a review ladder with fresh-context dual review, a 3-leg merge gate with a measurement-noise clause, and preflight-gated autonomous loops. Built for solo operators running agents on things that matter.",
+  "author": { "name": "girazan" }
+}
