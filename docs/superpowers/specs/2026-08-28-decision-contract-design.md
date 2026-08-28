@@ -35,7 +35,12 @@ deep-overrides the project copy (existing lock mechanism — lock always wins).
 }
 ```
 
-- Domains are expertise territories, not risk tiers.
+- Domains are expertise territories, not risk tiers — and the map is
+  SYMMETRIC: it records where the human's judgment is real (those stay
+  `decide: human`) and where it isn't (forcing approval there is theater).
+  In human-unspecialized `decide: ai` domains, cross-model review in fresh
+  contexts is the stand-in for human judgment — that is what the review
+  ladder's dual-review step is FOR.
 - `decide`: `ai` | `human`. There is no middle value: EVERY autonomous
   decision of consequence requires a `Ruling:` line (record discipline),
   so "ai with ruling" is the only kind of `ai` there is.
@@ -176,13 +181,27 @@ handoff/session-end.
 
 ## §5 README reframe
 
-Rewritten around the operator's seven premises; opens with "you decide once
-what the AI may decide"; the contract is the front door, the 3 commands
-(`/orch:setup`, `/orch:goal`, `/orch:go`) are the daily surface,
-ladder/gates/hooks the machinery. Plain-language register and glossary
-retained. The enforcement claim is stated honestly: the hook wall gates
-this repo's git commit/push and blocks history-rewriters; it is not a
-sandbox.
+Opens with the symmetric-limits frame (operator-authored, rephrased):
+humans have intent and judgment but only inside their specialty and only
+for so many hours; frontier AI now thinks and judges, not just acts, but
+every model has a token budget and a price. orch splits work along those
+limits — the contract records where the human's judgment is real AND where
+it isn't; in human-unspecialized domains, cross-model fresh-context review
+is the stand-in judge ("two independent judges catching each other's blind
+spots beats one human nodding at code they can't evaluate"). The model
+ladder by tier: frontier thinks (plans, routes, final verdict) · high-end
+reviews (fresh-context second opinion) · mid-tier executes · low-end does
+the mechanical — then frontier/high-end reviews again before anything
+lands; the human gets the report after, per contract. Closing line of the
+frame: intent and judgment from the human, judgment and labor from the
+machines, and a written map of who's specialized in what — the map is the
+contract.
+
+Then: the seven premises condensed, the contract JSON, the 3 commands
+(`/orch:setup`, `/orch:goal`, `/orch:go`), records, the seven-hook table,
+configure, glossary. Plain-language register retained. Enforcement stated
+honestly: the hook wall gates this repo's git commit/push and blocks
+history-rewriters; it is not a sandbox.
 
 ## §6 Tests
 
