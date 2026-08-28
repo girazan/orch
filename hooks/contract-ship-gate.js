@@ -1,0 +1,276 @@
+// PreToolUse (Bash|PowerShell) — the contract's ship gate.
+// DENY-BY-DEFAULT: with an active contract, git subcommands outside a
+// read/local allowlist are refused; commit/push are gated by repo STATE
+// (staged ∪ dirty ∪ unpushed) — command arguments are never trusted for
+// file resolution, so quoting/pathspec/alias games have nothing to bypass.
+// Fail CLOSED on: corrupt/invalid config, retargeting (cd/-C/GIT_DIR),
+// denied verbs, non-narrow push args, unresolvable base, empty file set,
+// oversized payload. Inactive (no contract key, or valid empty domains)
+// is the only silent pass-through. Every other exit writes an audit line.
+'use strict';
+const { execFileSync } = require('child_process');
+const { readStdin, loadConfig, appendAudit, AUDIT_REL } = require('./lib/config');
+
+const RANK = { none: 0, commit: 1, push: 2 };
+// Deny-by-default: only local/read commands escape the gate untouched.
+// submodule/worktree/clone/init/archive/format-patch/remote/config/clean
+// are deliberately NOT here — each can write history or touch a remote.
+const READ_ALLOW = new Set(['status', 'log', 'diff', 'show', 'fetch', 'add', 'rm', 'mv', 'restore',
+  'switch', 'checkout', 'branch', 'stash', 'rev-parse', 'ls-files', 'ls-remote', 'describe', 'blame',
+  'shortlog', 'reflog', 'grep', 'apply', 'help', 'version']);
+
+const { j, oversized } = readStdin();
+const cmd = (j && j.tool_input && (j.tool_input.command || '')) || '';
+
+// Whole-command lexer: a quoted span becomes ONE token carrying its raw
+// content (a quoted refspec/message is seen, never deleted or split on).
+// Bare words are cut wherever a shell metachar sits, even glued to a word
+// edge ("push)" -> "push", ")"), so grouping/list operators are never
+// hidden inside what looks like a single argument.
+function tokenizeAll(command) {
+  const toks = [];
+  const STOP = ' \t\r\n;&|(){}"\'';
+  let i = 0;
+  const n = command.length;
+  while (i < n) {
+    const c = command[i];
+    if (c === ' ' || c === '\t' || c === '\r') { i++; continue; }
+    if (c === '\n') { toks.push({ text: ';', quoted: false }); i++; continue; }
+    if (c === '"' || c === "'") {
+      const q = c;
+      let k = i + 1, buf = '';
+      while (k < n && command[k] !== q) { buf += command[k]; k++; }
+      toks.push({ text: buf, quoted: true });
+      i = k + 1;
+      continue;
+    }
+    if (command.startsWith('&&', i)) { toks.push({ text: '&&', quoted: false }); i += 2; continue; }
+    if (command.startsWith('||', i)) { toks.push({ text: '||', quoted: false }); i += 2; continue; }
+    if (';&|(){}'.includes(c)) { toks.push({ text: c, quoted: false }); i++; continue; }
+    let k = i, buf = '';
+    while (k < n && !STOP.includes(command[k])) { buf += command[k]; k++; }
+    if (buf) toks.push({ text: buf, quoted: false });
+    i = k;
+  }
+  return toks;
+}
+
+const SEP = new Set(['&&', '||', ';', '&', '|', '{', '}', '(', ')']);
+const KEYWORD_SEP = new Set(['then', 'do', 'else', 'fi', 'done', 'if', 'for', 'while']);
+
+// Segment = one shell "statement": split on pipes/lists/grouping/keywords
+// so `{ cd ../victim && git push; }` sees both cd and push, while a quoted
+// `;` inside a commit message never escalates ("wip; git push later" is
+// message text, not a second command).
+function toSegments(command) {
+  const segs = [[]];
+  for (const t of tokenizeAll(command)) {
+    if (!t.quoted && (SEP.has(t.text) || KEYWORD_SEP.has(t.text))) { segs.push([]); continue; }
+    segs[segs.length - 1].push(t);
+  }
+  return segs.filter(s => s.length);
+}
+
+const CD_RE = /^(cd|chdir|pushd|popd|sl|set-location|push-location)$/i;
+
+function classify(command) {
+  const res = { action: 0, denied: null, retarget: false, pushSeg: null };
+  const hasEnvRetarget = /GIT_DIR|GIT_WORK_TREE/.test(command);
+  const segs = toSegments(command);
+  // Retarget-token scan is command-wide, not per-segment: `{ cd ../victim
+  // && git push; }` puts cd and push in different segments on purpose.
+  const hasCd = segs.some(seg => seg.some(tok => !tok.quoted && CD_RE.test(tok.text)));
+  for (const seg of segs) {
+    const t = seg.map(x => x.text);
+    const gi = t.findIndex(x => /^git(\.exe)?$/i.test(x));
+    if (gi < 0) continue;
+    let sub = null, subIdx = -1, retargetFlag = false;
+    for (let i = gi + 1; i < t.length; i++) {
+      const x = t[i];
+      if (x === '-c') { i++; continue; }
+      if (x === '-C') { retargetFlag = true; i++; continue; }
+      if (/^--?(git-dir|work-tree)(=|$)/.test(x)) { retargetFlag = true; continue; }
+      if (x.startsWith('-')) continue;
+      sub = x; subIdx = i; break;
+    }
+    if (sub === null) continue; // bare `git` / flags only: git errors by itself
+    if (READ_ALLOW.has(sub)) continue; // -C/--git-dir on a read op is harmless
+    if (retargetFlag) res.retarget = true;
+    if (sub === 'commit') {
+      const amend = seg.slice(subIdx + 1).some(tok => !tok.quoted && tok.text === '--amend');
+      if (amend) res.denied = res.denied || 'git commit --amend'; // no amend-union path — operator only
+      else res.action = Math.max(res.action, 1);
+    } else if (sub === 'push') {
+      res.action = Math.max(res.action, 2);
+      res.pushSeg = t.slice(subIdx + 1);
+    } else {
+      // Unknown, aliased, or history-writing subcommand.
+      res.denied = res.denied || `git ${sub}`;
+    }
+  }
+  if ((res.action > 0 || res.denied) && (hasEnvRetarget || hasCd)) res.retarget = true;
+  return res;
+}
+
+const cls = cmd ? classify(cmd) : { action: 0, denied: null, retarget: false };
+if (!oversized && cls.action === 0 && !cls.denied) process.exit(0);
+
+function git(cwdArg, args) {
+  // stdio pipes everywhere: a blocked command must print exactly ONE
+  // message (ours) — a git subprocess's own stderr is captured, never
+  // inherited onto the terminal.
+  return execFileSync('git', ['-C', cwdArg, '-c', 'core.quotePath=false', ...args],
+    { timeout: 5000, stdio: ['ignore', 'pipe', 'pipe'] }).toString();
+}
+
+const cwd = (j && j.cwd) || process.cwd();
+let root = null;
+try { root = git(cwd, ['rev-parse', '--show-toplevel']).trim(); } catch {}
+
+const cfg = loadConfig({ cwd: root || cwd });
+const contract = cfg.contract;
+const label = cls.denied ? `denied:${cls.denied}` : cls.action === 2 ? 'push' : 'commit';
+
+// Attempted once, only if needed: a die() before root resolves (oversized,
+// unresolvable repo) still tries process.cwd() so the audit trail survives
+// a hook invoked with an unhelpful/missing cwd in the payload.
+let rootFromCwd;
+function auditRoot() {
+  if (root) return root;
+  if (rootFromCwd === undefined) {
+    try { rootFromCwd = git(process.cwd(), ['rev-parse', '--show-toplevel']).trim(); }
+    catch { rootFromCwd = null; }
+  }
+  return rootFromCwd;
+}
+
+function die(reason, extra) {
+  const r = auditRoot();
+  if (r) {
+    appendAudit(r, { action: (extra && extra.action) || label, ...(extra || {}), verdict: 'BLOCK', reason, by: 'hook' });
+    console.error(`BLOCKED (orch ship-gate): ${reason}`);
+  } else {
+    console.error(`BLOCKED (orch ship-gate): ${reason} (unaudited: no repo root)`);
+  }
+  process.exit(2);
+}
+
+if (oversized) die('oversized hook payload — command unverifiable.', { action: 'invalid' });
+if (cfg.__corrupt) die('.claude/orch.json is not valid JSON — the contract cannot be read; fix it first.', { action: 'invalid' });
+if (!contract) process.exit(0);
+// Contract key present: validate the WHOLE shape before any inactive/no-op decision.
+if (typeof contract !== 'object' || contract === null || Array.isArray(contract) ||
+    typeof contract.domains !== 'object' || contract.domains === null || Array.isArray(contract.domains)) {
+  die('contract present but malformed — fix .claude/orch.json', { action: 'invalid' });
+}
+for (const [name, d] of Object.entries(contract.domains)) {
+  if (!d || typeof d !== 'object' ||
+      !Object.prototype.hasOwnProperty.call(RANK, d.ship) ||
+      !['ai', 'human'].includes(d.decide) ||
+      !Array.isArray(d.paths) || !d.paths.every(p => typeof p === 'string')) {
+    die(`contract invalid (domain "${name}") — fix .claude/orch.json`, { action: 'invalid' });
+  }
+}
+if (!Object.keys(contract.domains).length) process.exit(0); // valid, deliberately inactive
+if (!root) die('not inside a git repository yet a git ship action was issued — refusing to gate blind.', { action: 'invalid' });
+
+if (cls.retarget) die('cd/pushd/-C/--git-dir/GIT_DIR retargeting alongside a gated git action — this gate covers one repo; the operator runs cross-repo commands.', { action: 'retarget' });
+if (cls.denied) die(`${cls.denied} is not on the contract's git surface (read/local commands, commit, push). The operator runs it, or an ADR grants a workflow that needs it.`);
+
+function names(out) {
+  return [...new Set(out.split(/\r?\n/).map(s => s.replace(/[\r\n]+$/, '')).filter(Boolean))];
+}
+
+if (cls.action === 2) {
+  // Narrow push shape, evaluated on quote-preserved tokens.
+  const ALLOWED_FLAGS = new Set(['-u', '--set-upstream', '-q', '--quiet', '-v', '--verbose']);
+  const pt = cls.pushSeg || [];
+  const flags = pt.filter(x => x.startsWith('-'));
+  const pos = pt.filter(x => !x.startsWith('-'));
+  let branch = null;
+  try { branch = git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).trim(); } catch {}
+  if (flags.some(f => !ALLOWED_FLAGS.has(f)) || pt.some(x => x.includes(':')) ||
+      pos.length > 2 || (pos.length === 2 && pos[1] !== branch && pos[1] !== 'HEAD')) {
+    die('push arguments outside the narrow shape (plain / <remote> / -u <remote> <current-branch>) — the operator runs it.');
+  }
+}
+
+let files = [];
+try {
+  // STATE-based, always-union: strict superset of anything a commit/push
+  // variant could land. No argument parsing exists to bypass.
+  files.push(...names(git(root, ['diff', '--cached', '--name-only'])));
+  files.push(...names(git(root, ['diff', '--name-only'])));
+  if (cls.action === 2) {
+    let base = null;
+    for (const ref of ['@{push}', '@{u}']) {
+      try { base = git(root, ['rev-parse', ref]).trim(); break; } catch {}
+    }
+    if (!base) {
+      try {
+        const def = git(root, ['symbolic-ref', 'refs/remotes/origin/HEAD']).trim();
+        base = git(root, ['merge-base', 'HEAD', def]).trim();
+      } catch {}
+    }
+    if (!base) {
+      // First push of a branch whose local origin/HEAD symref was never
+      // set (no prior clone/`remote set-head`): ask the remote directly.
+      // Read-only (ls-remote) — a gate never fetches to establish a base.
+      try {
+        const out = git(root, ['ls-remote', '--symref', 'origin', 'HEAD']);
+        const m = out.match(/ref:\s*refs\/heads\/(\S+)\s+HEAD/);
+        if (m) {
+          const def = `origin/${m[1]}`;
+          git(root, ['rev-parse', def]); // must already exist locally — no fetch
+          base = git(root, ['merge-base', 'HEAD', def]).trim();
+        }
+      } catch {}
+    }
+    if (!base) die("push base unresolvable (no upstream, no origin default) — the first push is the operator's.");
+    files.push(...names(git(root, ['diff', `${base}..HEAD`, '--name-only'])));
+  }
+} catch (e) {
+  die(`cannot resolve repo state (${String(e.message).split('\n')[0]}) — refusing to gate blind.`);
+}
+files = [...new Set(files)];
+if (!files.length) {
+  die("nothing resolvable to gate — empty/fileless mutations (--allow-empty, tag moves) are the operator's.");
+}
+// The hook's own evidence file must never deadlock its own gate.
+const auditRel = AUDIT_REL.replace(/\\/g, '/');
+files = files.filter(f => f.replace(/\\/g, '/') !== auditRel);
+if (!files.length) {
+  die('only the audit file is pending — nothing gateable — the operator decides.');
+}
+
+function globToRe(glob) {
+  const parts = glob.split('/').map(part =>
+    part === '**' ? ' ' :
+    part.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]'));
+  return new RegExp('^' + parts.join('/').replace(/ \//g, '(?:.*/)?').replace(/ /g, '.*') + '$');
+}
+
+let overall = 2, governing = null, offenders = [];
+for (const f of files) {
+  const p = f.replace(/\\/g, '/');
+  let grant = null, gDom = null;
+  for (const [name, d] of Object.entries(contract.domains)) {
+    if (d.paths.some(pat => globToRe(pat).test(p))) {
+      if (grant === null || RANK[d.ship] < grant) { grant = RANK[d.ship]; gDom = name; }
+    }
+  }
+  if (grant === null) { grant = 0; gDom = 'unmatched'; }
+  if (governing === null || grant < overall) { overall = grant; governing = gDom; }
+  if (grant < cls.action) offenders.push(`${p} (${gDom})`);
+}
+
+if (cls.action > overall) {
+  appendAudit(root, { action: label, files, domain: governing, verdict: 'BLOCK', by: 'hook' });
+  const who = governing === 'unmatched'
+    ? 'no domain matches — omission never grants; write a proposed ADR amendment instead'
+    : `domain "${governing}" grants "${Object.keys(RANK).find(k => RANK[k] === overall)}" — the operator ships this`;
+  console.error(`BLOCKED (orch ship-gate): git ${label} exceeds contract. ${who}. Files: ${offenders.slice(0, 5).join(', ')}${offenders.length > 5 ? ` +${offenders.length - 5} more` : ''}`);
+  process.exit(2);
+}
+appendAudit(root, { action: label, files, domain: governing, verdict: 'ALLOW', by: 'hook' });
+process.exit(0);
