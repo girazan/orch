@@ -63,6 +63,14 @@ Per project: `<project>/.claude/orch.json`. Everything is optional; hooks that
 need config no-op without it. The destructive-git block and context monitor
 are on by default.
 
+**Lock file (optional):** `~/.claude/orch-lock.json` — same shape as
+`orch.json`, but it wins over every project's config. Use it to make sure no
+per-repo file (yours, or one an agent wrote) can quietly switch a guard off:
+
+```json
+{ "destructiveGit": { "enabled": true } }
+```
+
 ```json
 {
   "protectedDirs": ["acceptance"],

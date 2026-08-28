@@ -31,9 +31,15 @@ short status table, one row per front. Edit the row and COMMIT it whenever a
 front's status or blocker changes: an uncommitted board edit is an unrecorded
 one, and `git log` on the file is the campaign journal. Status vocabulary:
 **ready** (shaped, unowned) · **running** · **review** (in the ladder below) ·
-**blocked** (MUST name the blocker AND who owns unblocking it) · **merged**.
+**blocked** (MUST name the blocker AND who owns unblocking it) ·
+**needs_attention** (work ended without evidence — see below) · **merged**.
 A front sitting blocked for more than a session without a named unblock-owner
 is board theater — surface it, don't recite past it.
+
+**Evidence-before-done:** a row may flip to **merged** only when a ledger line
+(or an artifact path) in the front's dossier backs it. A hand-back or loop that
+ends without that trail goes to **needs_attention** — never silently closed,
+and it doesn't block sibling fronts.
 
 **Session start (work sessions):** read the board → report state in ≤5 lines →
 propose the next task → operator picks. Detail lives in per-front dossier
@@ -41,7 +47,10 @@ files, never in the board.
 
 ## Review ladder (per hand-back — order is mandatory)
 
-1. **MECHANICAL first, cheap tier:** `git diff --stat` + build + scoped tests —
+1. **MECHANICAL first, cheap tier:** **empty-result check before anything** —
+   if the claimed diff is empty or a claimed artifact is absent/zero-length,
+   auto-FAIL now; "agent ran, produced nothing" must never cost a review round.
+   Then `git diff --stat` + build + scoped tests —
    no judgment needed, so spend no judgment-model tokens on it. Fail → straight
    back to the implementer. Hand-backs that add or change tests also get the
    **test-quality audit**: ① circular-oracle check (does the test import the
@@ -52,9 +61,13 @@ files, never in the board.
 2. **JUDGMENT second:** diff review by the strongest model, verdict-only.
    High-consequence hand-backs (numerics, security, data integrity, public
    contracts) additionally get a second reviewer from a **different model
-   family, in a FRESH context**, with the same PASS/FAIL rubric — same-thread
+   family, in a FRESH context**, with the same rubric — same-thread
    re-review only confirms old findings are fixed; it never finds new ones.
-   **Both reviewers must PASS; one FAIL fails the hand-back.** Merge both
+   **Verdicts are tri-state: PASS / FAIL / INCONCLUSIVE.** INCONCLUSIVE
+   (evidence ambiguous rather than wrong — e.g. can't reproduce, oracle
+   unclear) HOLDS the hand-back for the operator: no auto-retry, no forced
+   verdict, and it does not consume a loop round. **Both reviewers must PASS;
+   one FAIL fails the hand-back; one INCONCLUSIVE holds it.** Merge both
    finding lists, dedupe, fix all. **Artifact reality check:** anything the
    hand-back claims to have added must pass EXISTS (present) → SUBSTANTIVE
    (not a stub) → WIRED (actually called/registered; an uncalled
@@ -83,13 +96,19 @@ Evidence + baseline SHA go in the PR body.
 
 ## Loop preflight (gates EVERY autonomous-loop launch)
 
+**Topology check first (advisory):** is this task actually loop-shaped —
+multiple uncertain iterations against a metric? A single-pass fix or a 2–3
+step known change costs less done directly; say so instead of launching.
+
 Refuse to launch until all five hold (any ✗ → fix the loop's prompt file first):
 
 1. **Machine-decidable completion promise** — a probe/test/exit-code decides
    it, never the loop's prose claim of success.
 2. **Boundaries stated** — what the loop must NOT touch (protected dirs,
    authored values without sources, the gates themselves).
-3. **Iteration cap set** — and understood as the real safety net.
+3. **Iteration cap AND spend budget set** — both understood as the real
+   safety net: the loop dies on whichever trips first (iterations, or a stated
+   token/cost ceiling for the whole run), not only when context runs low.
 4. **Judge independence** — the verdict comes from an external check's output,
    never the loop grading its own work (a loop that writes its own verdict
    always converges to "done").
