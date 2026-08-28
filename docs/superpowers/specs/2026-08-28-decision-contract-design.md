@@ -1,6 +1,7 @@
 # orch v0.3.0 — The Decision Contract
 
-Date: 2026-08-28 · Status: approved by operator (sectioned review in-session)
+Date: 2026-08-28 · Status: approved by operator (sectioned review in-session,
+rev 2: skill split into 7 commands)
 
 ## Premise
 
@@ -72,8 +73,8 @@ New `hooks/contract-ship-gate.js`, PreToolUse on Bash|PowerShell, wired in
 ADR authorship and status:
 - Pair mode (human + AI decide together) → `status: accepted` on write.
 - Autopilot (AI alone) → ALWAYS `status: proposed`; unratified ADRs surface
-  at session start alongside the board; human ratifies (→ accepted) or
-  rejects. The plugin never edits its own contract.
+  in bare `/orch`; human ratifies (→ accepted) or rejects via `/orch:setup`.
+  The plugin never edits its own contract.
 
 Contract versioning: the ship-gate keeps a hash of the contract block in temp
 state; on change it writes a `contract_changed` audit line with old→new
@@ -83,26 +84,42 @@ blocked (the editor may be the human).
 Learn-loop: change matches no domain (or domains conflict) → work parks
 (strictest) AND the AI writes a proposed ADR containing a ready-to-paste
 amendment (proposed domain, paths, expertise, decide/ship, rationale). Human
-accepts the ADR → edits orch.json → bumps version.
+accepts the ADR via `/orch:setup` → contract edited → version bumped.
 
-## §4 Skill restructure (`skills/orch/SKILL.md`)
+## §4 Skill family — seven commands, progressive disclosure
 
-- New leading section "The contract": routing consults it before role
-  assignment; merge-gate outcome routes by the domain's decide/ship instead
-  of always parking; ADR-vs-Ruling threshold; session-start surfacing of
-  unratified ADRs.
-- Roles reworded to the operator's framing: frontier AI orchestrates, plans,
-  reviews, gates; suited cheap AI executes; shipping per contract.
-- Existing machinery unchanged: review ladder (incl. v0.2.0 empty-result
-  gate + tri-state verdicts), 3-leg merge gate, board vocabulary (incl.
-  needs_attention), loop preflight, record discipline, handoff.
+The monolithic `skills/orch/SKILL.md` becomes seven small skills under
+`skills/`, each loading only its slice. Roles framing throughout: frontier AI
+orchestrates, plans, reviews, gates; suited cheap AI executes; shipping per
+contract.
+
+| Command | Loads | When |
+|---|---|---|
+| `/orch` (bare) | board + unratified ADRs + parked items → proposes next command | session start; "where are we" anytime. ≤5 lines out. The dispatcher: tells the user which command is next. |
+| `/orch:setup` | onboarding ritual: write/edit contract domains, lock file, `workflow.tools`; ratify/reject proposed ADRs | first install on a repo; contract governance |
+| `/orch:goal` | brief ritual (goal · metric · done-condition · domains touched · kill criteria) + shaping route (§7) | new front, or editing a front's goal/metric |
+| `/orch:route` | classify change → domain → decide/ship + tool pick; ends at operator approval, never starts work | before work starts |
+| `/orch:go` | roles, delegation, review ladder (incl. empty-result gate + tri-state verdicts), record discipline | after route agreed — the heavy one |
+| `/orch:ship` | 3-leg merge gate + contract ship check + audit line | work done, wants to land |
+| `/orch:loop` | 5-check preflight + launch journal | before any autonomous run |
+
+Chain enforced by artifacts, not memory: `:goal` writes the brief → `:route`
+requires a brief and writes a `ROUTE:` line → `:go` requires the `ROUTE:`
+line → `:ship` requires ledger evidence. Each command checks its
+predecessor's artifact and refuses (with the pointer) if missing — skipped
+steps are visible, never silent.
+
+Carried over unchanged from v0.2.0 into the relevant commands: board
+vocabulary incl. needs_attention + evidence-before-done (bare, :ship),
+review ladder + stall rule (:go), merge gate + noise clause (:ship),
+preflight (:loop), handoff/session-end + hook-wall summary (bare, :go).
 
 ## §5 README reframe
 
 Rewritten around the operator's seven premises; opens with "you decide once
-what the AI may decide"; the contract is the front door, ladder/gates/hooks
-presented as the machinery enforcing it. Plain-language register and glossary
-retained.
+what the AI may decide"; the contract is the front door, the 7 commands are
+the daily surface, ladder/gates/hooks presented as the machinery enforcing
+it. Plain-language register and glossary retained.
 
 ## §6 Tests
 
@@ -111,11 +128,13 @@ retained.
   no-contract no-op, lock-file overriding a domain, audit-line written on
   allow and block, contract-hash-change line, no-upstream push resolution.
 - Regression: existing 7-case lock matrix + 12-case hook matrix stay green.
+- Skill-chain check (manual): each command refuses cleanly when its
+  predecessor artifact is missing.
 
 ## §7 Workflow layer — Brief → Front → Iterations
 
 Continuous flow, no timeboxes. The BRIEF format is the interface; the shaping
-tool is routed, not re-decided per task:
+tool is routed by `/orch:goal`, not re-decided per task:
 
 | Task shape | Default tool | Fallback |
 |---|---|---|
@@ -126,9 +145,8 @@ tool is routed, not re-decided per task:
 
 Optional `workflow.tools` map in orch.json overrides defaults (e.g. for Matt
 Pocock-style plugins). Whatever tool runs, its output lands as the BRIEF at
-the top of the front's dossier: goal · metric · done-condition · contract
-domains touched · kill criteria (≤1 page). Then: front on BOARD.md →
-iterations (ledger lines) → done-condition or kill.
+the top of the front's dossier. Then: front on BOARD.md → iterations (ledger
+lines) → done-condition or kill.
 
 ## Files touched
 
@@ -137,6 +155,7 @@ iterations (ledger lines) → done-condition or kill.
 | `hooks/contract-ship-gate.js` | NEW (~120 ln) |
 | `hooks/hooks.json` | +1 wiring |
 | `hooks/lib/config.js` | + audit append helper |
-| `skills/orch/SKILL.md` | contract section leads; workflow layer; ADR/Ruling |
-| `README.md` | rewritten around the premises |
+| `skills/orch/SKILL.md` | becomes the bare dispatcher (thin) |
+| `skills/{setup,goal,route,go,ship,loop}/SKILL.md` | NEW ×6, split from monolith |
+| `README.md` | rewritten around the premises + 7 commands |
 | `.claude-plugin/plugin.json` | 0.3.0 |
