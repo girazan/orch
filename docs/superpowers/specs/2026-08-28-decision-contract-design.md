@@ -72,10 +72,13 @@ New `hooks/contract-ship-gate.js`, PreToolUse on Bash|PowerShell, wired in
 and soundly — so when an active contract exists, the git surface is
 DENY-BY-DEFAULT, and file resolution NEVER parses command arguments.
 
-**Ordering:** repo root first (`git rev-parse --show-toplevel` from
-`j.cwd`; not a repo → exit 0), then config from the ROOT only, then
-classification, then resolution. All git calls use
-`-c core.quotePath=false`.
+**Ordering:** classification first (cheap exit for non-git commands), then
+repo root (`git rev-parse --show-toplevel` from `j.cwd`), then config.
+Outside a repo the gate normally exits 0 because no root config exists —
+but if the cwd-fallback config activates a contract anyway, a ship action
+with no repo root fails CLOSED (dying on the unresolvable is stricter than
+the git error that follows, and strictness is the tie-breaker). All git
+calls use `-c core.quotePath=false` and `GIT_TERMINAL_PROMPT=0`.
 
 **Classification — quote-aware end to end.** The WHOLE command is
 tokenized first (`"…"`/`'…'` spans become single tokens carrying their
@@ -86,8 +89,12 @@ forms `{`, `}`, `(`, `)`, `then`, `do`, `else`, `fi`, `done`, `if`,
 (`git commit -m "wip; git push later"` is ONE commit segment) and
 grouping can never hide one (`{ cd x && git push; }` splits).
 - Per git segment, the SUBCOMMAND is the first non-flag token after the
-  git word (`-c` skips its value). A subcommand containing quotes or `$`
-  is never a known word → falls to deny.
+  git word (`-c` skips its value; the git word matches by BASENAME, so
+  `/usr/bin/git` counts). A subcommand containing `$` or partial quoting
+  (`p'u'sh`) is never a known word → falls to deny; a fully-quoted known
+  word (`git "commit"`) is gated exactly as its unquoted form. A segment
+  that consumed a retarget flag but lost its subcommand to a keyword split
+  (`git -C do push`) denies rather than being skipped.
 - READ/LOCAL ALLOWLIST (segment ignored): status · log · diff · show ·
   fetch · add · rm · mv · restore · switch · checkout · branch · stash ·
   rev-parse · ls-files · ls-remote · describe · blame · shortlog · reflog ·
@@ -153,7 +160,8 @@ only silent pass-throughs.
 **Verdict mechanics:** strictest grant across all files; the audit file
 (fixed path, see §3) is exempt from domain mapping so evidence can never
 deadlock its own gate; governing domain tracked independently of rank;
-audit `action` field carries the REAL label (commit/push/denied:<word>).
+audit `action` field carries the REAL label — `commit` · `push` ·
+`denied:<word>` · `retarget` · `invalid`.
 
 **Honesty clause (spec + README):** this gates command strings passed to
 the shell tool. Indirection the string doesn't reveal — scripts that run
@@ -163,12 +171,13 @@ lines behind it.
 
 **Disclosure (README-mandatory):** deny-by-default costs the agent,
 daily: `pull` · `merge` (incl. `--continue`) · `rebase` · `cherry-pick` ·
-`revert` · `am` · `tag` · `commit --amend` · every git alias · `remote` /
-`config` / `submodule` / `worktree` subcommands · any push when nothing
-is pending · any commit while a human-domain file is dirty · the first
-push of a branch when no remote default is resolvable. Each block names
-the operator as the override. This list ships in the README, not only in
-block messages.
+`revert` · `am` · `tag` · `commit --amend` (any `--am*` abbreviation) ·
+every git alias · `remote` / `config` / `submodule` / `worktree` /
+`clone` / `init` / `clean` / `archive` / `format-patch` subcommands · any
+push when nothing is pending · any commit while a human-domain file is
+dirty · the first push of a branch when no remote default is resolvable.
+Each block names the operator as the override. This list ships in the
+README, not only in block messages.
 
 ## §3 Decision records — one system, three depths
 
@@ -219,6 +228,19 @@ Plugin skills always namespace as `orch:<name>` (there is no bare `/orch` —
 | work | `ROUTE:` line exists, done-condition not yet evidenced in ledger | `work.md` |
 | ship | ledger lines satisfy the BRIEF's done-condition | inline |
 | (none) | no front / no BRIEF → point to `/orch:goal`, stop | inline |
+
+Delegation reference `delegate.md` (loaded from route's tier pick and
+work's dispatch): roles-not-model-names tier table (low = transcription/
+mechanical/recon · mid = prose-brief implementation, fix rounds 1–2 ·
+high = review/adversarial verification · frontier = the orchestrator's own
+judgment, never delegated), the delegation-surface rule (one-shot →
+throwaway subagent with a self-contained brief; brief-after-brief fronts →
+resident pane if the runtime has one, else fresh subagents with the
+dossier as memory; verdicts never below high), subagents never spawn
+reviewers, and fix-loop escalation (resume same implementer rounds 1–2;
+round 3 = fresh implementer one tier up before the stall rule escalates).
+Optional `models` map in orch.json pins roles → the runtime's actual
+model names.
 
 Canonical artifact grammar (single source — every reader/writer uses it
 verbatim):
@@ -346,6 +368,7 @@ kill.
 | `skills/orch/` | REMOVED (renamed) |
 | `skills/go/SKILL.md` | NEW — driver: state machine + route/ship inline |
 | `skills/go/{work,loop}.md` | NEW ×2, heavy phases on demand |
+| `skills/go/delegate.md` | NEW (v0.3.1) — tier table, delegation surfaces, fix-loop escalation |
 | `skills/{setup,goal}/SKILL.md` | NEW ×2 |
 | `tests/` | NEW in-repo: audit, ship-gate, lock (ported), destructive-git smoke |
 | `README.md` | rewritten around the premises + 3 commands |

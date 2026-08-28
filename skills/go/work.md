@@ -1,9 +1,11 @@
 # Phase: work (ROUTE: exists, done-condition not evidenced)
 
-Delegate execution to the tier named in the ROUTE: line. Reviewers are
-verdict-only — a reviewer never implements the fix it proposes. Never
-delegated: protected-directory edits, authored values without a cited
-source, judgment the contract reserves for the operator.
+Delegate execution to the tier named in the ROUTE: line — surfaces,
+tier table, and fix-loop escalation live in `delegate.md` (load it when
+dispatching). Reviewers are verdict-only — a reviewer never implements
+the fix it proposes. Never delegated: protected-directory edits, authored
+values without a cited source, judgment the contract reserves for the
+operator.
 
 ## Review ladder (per hand-back — order is mandatory)
 

@@ -80,6 +80,7 @@ Detail lives in dossiers, never the board.
 3. Execution shape: number+cause-unknown → measurement-first iteration ·
    mechanical/spec-complete → cheapest tier, single review ·
    judgment-heavy/high-consequence → mid-tier implement + dual review.
+   Tier + delegation vehicle come from `delegate.md` (load it here).
 4. `decide: human` → present plan ≤5 lines, STOP; write the ROUTE line
    only on approval, with `approved:operator`. `decide: ai` → write it
    with `approved:auto`.

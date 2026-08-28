@@ -87,13 +87,14 @@ AI types* — deny-by-default outside a short read/local allowlist, and it
 judges a commit or push by what's actually sitting in your repo — staged,
 dirty, unpushed — never by the command's arguments, so argument tricks
 (quoting, aliases, a `cd` mid-command) have nothing to fool. It is not a
-sandbox: a script that runs `git` from inside is out of its sight. The lock
-file and you are the lines behind it.
+sandbox: a script — or any interpreter you hand a command string to — runs
+`git` out of its sight. The lock file and you are the lines behind it.
 
 **What deny-by-default costs you, day to day:** the AI can't `pull`,
 `merge` (including `--continue`), `rebase`, `cherry-pick`, `revert`, `am`,
 `tag`, `commit --amend`, use a git alias, or run `remote` / `config` /
-`submodule` / `worktree` — ever, contract or no. It also can't push when
+`submodule` / `worktree` / `clone` / `init` / `clean` / `archive` /
+`format-patch` — while a contract is active. It also can't push when
 nothing is pending, commit while a domain you reserved for yourself is
 dirty, or make the very first push of a new branch if no remote default is
 resolvable. Every one of those blocks names you, specifically, as the
@@ -114,6 +115,10 @@ override — if you truly want it done, you run it yourself.
   board, the front's notes, and the contract; decides the current phase on
   its own (route the work → do the work → ship it, or run a whole
   unattended loop) and stops only where the contract says a human must.
+  It also picks who does each piece: cheap models for mechanical work,
+  mid-tier for implementation, high-end for review, frontier for judgment —
+  and whether a task gets a throwaway helper or a long-lived worker (pin
+  the tiers to your own models once via `models` in `orch.json`).
   There is no bare `/orch` — it's always one of these three.
 
 ## Records
@@ -149,8 +154,10 @@ The rules that are *enforced*, not remembered:
 
 Per project: `<project>/.claude/orch.json`. Everything is optional; hooks
 that need config no-op without it. `block-destructive-git` and
-`context-monitor` are on by default; `contract-ship-gate` only activates
-once you add a `contract` block.
+`context-monitor` are on by default; `contract-ship-gate` activates once
+you add a `contract` block — with one exception: a corrupt (unparseable)
+`orch.json` blocks commits and pushes until you fix it, because a broken
+config must never silently disable the gate.
 
 ```json
 {

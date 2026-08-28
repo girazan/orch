@@ -97,7 +97,14 @@ function classify(command) {
       if (x.startsWith('-')) continue;
       sub = x; subIdx = i; break;
     }
-    if (sub === null) continue; // bare `git` / flags only: git errors by itself
+    if (sub === null) {
+      // Bare `git`/flags-only errors by itself — EXCEPT when a retarget
+      // flag was consumed and a keyword-named dir (`-C do`) severed the
+      // subcommand into the next segment: skipping that silently would be
+      // an unaudited retarget, so it denies instead.
+      if (retargetFlag) res.denied = res.denied || 'git (retarget flags, no resolvable subcommand)';
+      continue;
+    }
     if (READ_ALLOW.has(sub)) continue; // -C/--git-dir on a read op is harmless
     if (retargetFlag) res.retarget = true;
     if (sub === 'commit') {
@@ -251,10 +258,12 @@ if (!files.length) {
 }
 
 function globToRe(glob) {
+  // \u0000 sentinel: cannot occur in a path, so a glob containing spaces
+  // ("my docs/**") can never collide with the ** placeholder.
   const parts = glob.split('/').map(part =>
-    part === '**' ? ' ' :
+    part === '**' ? '\u0000' :
     part.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]'));
-  return new RegExp('^' + parts.join('/').replace(/ \//g, '(?:.*/)?').replace(/ /g, '.*') + '$');
+  return new RegExp('^' + parts.join('/').replace(/\u0000\//g, '(?:.*/)?').replace(/\u0000/g, '.*') + '$');
 }
 
 let overall = 2, governing = null, offenders = [];

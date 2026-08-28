@@ -30,7 +30,7 @@ function loadLock() {
 }
 
 function readStdin() {
-  // Returns { j, raw, oversized }. Callers decide fail-open vs fail-closed.
+  // Returns { j, oversized }. Callers decide fail-open vs fail-closed.
   let raw;
   try { raw = fs.readFileSync(0); } catch { return { j: null, oversized: false }; }
   if (raw.length >= 1_048_576) return { j: null, oversized: true };

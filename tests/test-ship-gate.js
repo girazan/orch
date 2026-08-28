@@ -312,6 +312,7 @@ check('git remote set-url origin ../x -> 2 (denied)', run('git remote set-url or
 check("git config alias.x '!git push' -> 2 (denied)", run("git config alias.x '!git push'").code === 2);
 check('Push-Location ../victim; git push -> 2 (retarget)', run('Push-Location ../victim; git push').code === 2);
 check('sl ../victim; git push -> 2 (retarget)', run('sl ../victim; git push').code === 2);
+check('git -C do push -> 2 (keyword-severed retarget denies, not skips)', run('git -C do push').code === 2);
 check('{ cd ../victim && git push; } -> 2 (grouping split)', run('{ cd ../victim && git push; }').code === 2);
 
 writeFile('tests/msgsafe.js');
