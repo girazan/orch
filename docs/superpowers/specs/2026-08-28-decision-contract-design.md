@@ -1,7 +1,7 @@
 # orch v0.3.0 — The Decision Contract
 
-Date: 2026-08-28 · Status: approved rev 3; rev 4 incorporates dual-review
-findings (Codex-Sol + Opus, both FAIL verdicts, all confirmed findings fixed)
+Date: 2026-08-28 · Status: rev 5 — round-2 dual review (both FAIL) triggered
+the stall rule; operator approved the deny-by-default redesign of §2
 
 ## Premise
 
@@ -14,10 +14,14 @@ hooks.
 
 ## §1 Contract schema
 
-`.claude/orch.json`, new `contract` block. **Security note:** the project
-file is agent-writable; for guarantees against self-loosening, `/orch:setup`
-offers to mirror the contract into `~/.claude/orch-lock.json`, which
-deep-overrides the project copy (existing lock mechanism — lock always wins).
+`.claude/orch.json` at the REPO ROOT (discovered via `git rev-parse
+--show-toplevel`; nested `.claude/orch.json` files are never consulted —
+a subdirectory config must not shadow the governing contract). **Security
+note:** the project file is agent-writable; `/orch:setup` offers to mirror
+the contract into `~/.claude/orch-lock.json`. A locked `contract` REPLACES
+the project's contract block atomically (never merged key-by-key — an
+additive merge would let the project file add new permissive domains
+beside the locked ones). Other lock keys keep the existing deep-merge.
 
 ```json
 "contract": {
@@ -58,62 +62,84 @@ deep-overrides the project copy (existing lock mechanism — lock always wins).
 - INCONCLUSIVE review/merge verdicts always go to the human regardless of
   domain.
 
-## §2 Ship-gate hook
+## §2 Ship-gate hook — deny-by-default git surface
 
 New `hooks/contract-ship-gate.js`, PreToolUse on Bash|PowerShell, wired in
-`hooks/hooks.json` alongside `block-destructive-git`.
+`hooks/hooks.json` alongside `block-destructive-git`. Design principle
+(round-2 review outcome): a shell command cannot be parsed permissively
+and soundly — so when an active contract exists, the git surface is
+DENY-BY-DEFAULT, and file resolution NEVER parses command arguments.
 
-**Command classification — per SEGMENT, strictest across the whole line:**
-split the command on `|`, `;`, `&`, newline; classify every segment; the
-required grant is the MAX action rank found in ANY segment (`git commit &&
-git push` requires push). `git`/`git.exe` with `-C`, `--git-dir`,
-`--work-tree`, or a `GIT_DIR=`/`GIT_WORK_TREE=` env prefix in the segment →
-fail CLOSED (the hook gates exactly one repo: the session's; re-targeting is
-the operator's move).
+**Ordering:** repo root first (`git rev-parse --show-toplevel` from
+`j.cwd`; not a repo → exit 0), then config from the ROOT only, then
+classification, then resolution. All git calls use
+`-c core.quotePath=false`.
 
-**Gated actions (only two, resolved precisely):**
-- `commit` → files = staged (`diff --cached --name-only`); `-a`/`--all` or a
-  pathspec/`--only`/`--include`/`--interactive`/`--patch` → union with
-  unstaged tracked changes (`diff --name-only`) — a strict superset errs
-  closed; `--amend` → union with `diff HEAD^ HEAD --name-only`.
-- `push` → allowed grammar is narrow: plain `git push`, `git push <remote>`,
-  `git push [-u] <remote> <current-branch>`. Files = `git diff <base>..HEAD
-  --name-only` (diff, never log — log is empty for merge commits) where
-  `<base>` = `@{push}` → `@{u}` → merge-base with the remote default branch.
-  No remote/base resolvable → fail CLOSED (first push is the operator's).
-  Refspecs (`a:b`), `--all`, `--mirror`, `--tags`, `--delete`, `--force*` →
-  fail CLOSED.
+**Classification — per segment (`|`, `;`, `&`, newline), quote-preserving
+tokenizer** (`"…"`/`'…'` content survives as one token — quoted refspecs
+and pathspecs are seen, not deleted):
+- Per git segment, the SUBCOMMAND is the first non-flag token after the
+  git word (`-c` skips its value). A subcommand containing quote characters
+  or `$` is never a known word → falls to deny.
+- READ/LOCAL ALLOWLIST (segment ignored): status · log · diff · show ·
+  fetch · add · rm · mv · restore · switch · checkout · branch · stash ·
+  rev-parse · ls-files · ls-remote · describe · blame · shortlog · reflog ·
+  remote · worktree · submodule · init · clone · config · clean · grep ·
+  apply · format-patch · archive · help · version. (Destructive variants
+  stay covered by `block-destructive-git`.)
+- GATED: `commit` (rank 1) · `push` (rank 2). Required grant = MAX rank
+  across all segments (`git commit && git push` requires push).
+- EVERYTHING ELSE — merge, rebase, cherry-pick, revert, am, pull, tag,
+  aliases, unknown or quote-mangled subcommands — fail CLOSED: "not on the
+  contract's git surface; the operator runs it, or an ADR grants it."
+- A gated/denied segment anywhere + `cd`/`pushd`/`Set-Location`/`GIT_DIR`/
+  `GIT_WORK_TREE` anywhere in the command → fail CLOSED (retargeting).
+  Same for `-C`/`--git-dir`/`--work-tree` on a non-allowlisted git segment.
+- `gh` segments: verbs view/list/status/checks/diff allowed; any other gh
+  verb (merge, create, edit, api, workflow, release, …) → fail CLOSED
+  (`gh api PUT /contents` is a remote commit).
 
-**Blocked outright when a contract exists** (history writers and remote
-ships whose file-sets can't be resolved safely): `git merge` (incl.
-`--continue`), `rebase`, `cherry-pick`, `revert`, `am`, `gh pr merge`.
-Message: operator runs it, or a contract amendment (ADR) grants a
-workflow that needs it.
+**File resolution — repo STATE, never command arguments:**
+- `commit` → staged ∪ unstaged-tracked (`diff --cached --name-only` ∪
+  `diff --name-only`); `--amend` present → also ∪ `diff HEAD^ HEAD`.
+  Always-union is deliberate: it is a strict superset of every commit
+  variant (`-a`, pathspec, `--only`, `--include`, quoted paths), so no
+  argument parsing exists to bypass. Consequence, stated plainly: a dirty
+  human-domain file blocks ANY commit until dealt with — fail-closed's
+  honest price.
+- `push` → the commit set ∪ `diff <base>..HEAD --name-only` (diff, never
+  log) where `<base>` = `@{push}` → `@{u}` → merge-base with the remote
+  default branch. None resolvable → fail CLOSED. Push args beyond a narrow
+  shape (flags outside `-u`/`--set-upstream`/`-q`/`--quiet`/`-v`/
+  `--verbose`; any token with `:`; >2 positionals; positional 2 ≠ current
+  branch) → fail CLOSED.
 
-**Fail-closed inventory (all exit 2, all audited):** oversized payload ·
-`.claude/orch.json` exists but is unparseable (corrupt config must never
-silently disable the gate) · contract present but invalid (schema check
-uses own-property lookups — `"ship":"toString"` is invalid, enums exact) ·
-unresolvable file list · **empty resolved file list** (`--allow-empty` and
-friends mutate history filelessly; git itself refuses true no-ops, so
-blocking empties costs nothing and closes the hole) · blocked-command list
-above. No `contract` block in a parseable config → no-op (exit 0), so
-pre-contract installs are unaffected.
+**Fail-closed inventory (exit 2, EVERY exit audited — unconditionally,
+with `process.cwd()` fallback when no root/config is loadable):** oversized
+payload · root `.claude/orch.json` unparseable · `contract` key present but
+invalid (own-property enum checks; `domains` must be a plain object of
+valid entries — `{"contract":{}}` is invalid, not inactive) · denied
+subcommand/verb · retargeting · non-narrow push args · unresolvable base ·
+empty resolved file set. INACTIVE (exit 0): no `contract` key, or
+`contract.domains` present-and-valid but empty `{}` — documented as the
+only silent pass-throughs.
 
-**Mechanics:** repo root discovered via `git rev-parse --show-toplevel`
-from `j.cwd` (config + globs are root-relative; monorepo subdir sessions
-still find the contract); all git calls use `-c core.quotePath=false`
-(non-ASCII paths must match globs, not their escaped quoting); the
-configured audit file itself is always-granted (evidence writing can never
-deadlock the gate that writes it); strictest grant across all files
-governs; the governing domain is tracked independently of rank so ALLOW
-audit lines always name it.
+**Verdict mechanics:** strictest grant across all files; the audit file
+(fixed path, see §3) is exempt from domain mapping so evidence can never
+deadlock its own gate; governing domain tracked independently of rank;
+audit `action` field carries the REAL label (commit/push/denied:<word>).
+
+**Honesty clause (spec + README):** this gates command strings passed to
+the shell tool. Indirection the string doesn't reveal — scripts that run
+git, interpreters, binaries — is out of scope by design; the lock file,
+the read-allowlist's deny-by-default posture, and the operator are the
+lines behind it.
 
 ## §3 Decision records — one system, three depths
 
 | Depth | Artifact | When |
 |---|---|---|
-| audit line | `.claude/orch-audit.jsonl` (path configurable; local-first — gitignoring `.claude/` is fine; if tracked, the file is gate-exempt per §2) | EVERY ship-gate exit — ALLOW, BLOCK, and every fail-closed path — `{ts, action, files, domain, verdict, reason?, by:"hook"}`; the skill mirrors Rulings as `{by:"ruling"}` lines |
+| audit line | `<repo-root>/.claude/orch-audit.jsonl` — FIXED path, deliberately not configurable (a configurable path was a verified gate bypass: point it at a protected file and the self-exemption ships it); local-first, gitignoring `.claude/` is fine; if tracked, gate-exempt per §2 | EVERY ship-gate exit — ALLOW, BLOCK, and every fail-closed path — `{ts, action, files, domain, verdict, reason?, by:"hook"}`; the skill mirrors Rulings as `{by:"ruling"}` lines |
 | `Ruling:` line | front's dossier + audit mirror | every autonomous decision of consequence: `Ruling: <decision> — <why> — <cost if wrong>` |
 | ADR | `docs/adr/NNNN-<slug>.md`, header `Status: proposed | accepted | rejected | superseded` | anything shaping structure, contracts, or future decisions — including every contract amendment |
 
@@ -152,9 +178,9 @@ Plugin skills always namespace as `orch:<name>` (there is no bare `/orch` —
 
 | Phase | Precedence (first match wins) | Where |
 |---|---|---|
+| closed | board row `merged` → report and stop; a shipped front never re-enters ship, and a merged front never enters loop | inline |
 | loop | operator's current message asks for an autonomous run (explicit input, the one non-artifact trigger) | `loop.md` |
-| closed | board row `merged` → report and stop; a shipped front never re-enters ship | inline |
-| route | BRIEF exists, no `ROUTE:` line | inline |
+| route | BRIEF exists, no `ROUTE:` line — includes the knowledge-gap re-check: if routing surfaces facts the AI can't derive or verify, the research route (§7) runs before the ROUTE line is written | inline |
 | work | `ROUTE:` line exists, done-condition not yet evidenced in ledger | `work.md` |
 | ship | ledger lines satisfy the BRIEF's done-condition | inline |
 | (none) | no front / no BRIEF → point to `/orch:goal`, stop | inline |
@@ -210,29 +236,39 @@ history-rewriters; it is not a sandbox.
 
 ## §6 Tests
 
-Ship-gate matrix (~30): per-segment strictest (`commit && push`) · allow/
-deny per action · implied grant (push⊃commit) · strictest-wins multi-domain
-· unmatched denial · nested `**/*.md` + anchoring (`docs2/` misses
-`docs/**`) · corrupt orch.json fail-closed · invalid enum (incl.
-`"toString"`) fail-closed · empty-domains no-op vs no-contract no-op ·
-`-C`/`--git-dir`/`GIT_DIR=` fail-closed · refspec/`--all`/`--mirror`/
-`--tags`/`--delete` fail-closed · blocked-command list (merge, rebase,
-cherry-pick, gh pr merge) · `--allow-empty` blocked · `commit -a` union ·
-pathspec-commit superset · `--amend` union · push via merge-base (merge
-commit contents included; diff-not-log) · no-remote fail-closed · governing
-domain named on all-push ALLOW · audit line on every exit incl. die paths ·
-audit-file self-exemption · lock-file domain override · oversized payload.
-Test harness: `commit.gpgsign=false` + `core.autocrlf=false` set in scratch
-repos; scratch dirs gitignored; teardown chmods `.git` objects before rm
-(Windows EPERM).
+The plan's test scripts are the authority on the exact check count — the
+expected outcome is "script exits 0", never a hardcoded N/N (count drift
+was a round-2 finding). Ship-gate matrix must cover: per-segment strictest
+(`commit && push`, both orders) · allow/deny per action · implied grant ·
+strictest-wins multi-domain · unmatched denial · nested `**/*.md` +
+anchoring (`docs2/`) · corrupt orch.json fail-closed · invalid contract
+shapes fail-closed (`{"contract":{}}`, `domains:null`, null domain entry,
+`"ship":"toString"`, non-array paths) · empty `domains:{}` inactive vs no
+contract key inactive · retarget fail-closed (`-C`, `--git-dir`,
+`GIT_DIR=`, `cd …&&`, `pushd`) · deny-by-default (alias `git ci`, quoted
+`git p'u'sh`, `$C` expansion, `pull`, `tag`, unknown) · blocked verbs
+(merge incl. `--continue`, rebase, cherry-pick, revert, am) · gh (pr merge
+denied, `api -X PUT` denied, `pr view` allowed) · push shape (refspec incl.
+QUOTED `"feature:main"`, `--all`, `--mirror`, `--tags`, `--delete`,
+`--force`, unknown flags denied; plain/`-u origin <branch>` allowed) ·
+`--allow-empty` blocked via empty-set rule · always-union commit (dirty
+human-domain file blocks plain commit — the documented trade-off) ·
+`--amend` union · push via merge-base with a merge commit (diff-not-log
+proven) · no-remote fail-closed · governing named on all-push ALLOW ·
+audit line present for ALLOW, policy BLOCK, and die paths incl. oversized
+(unconditional audit) · audit-file exemption (fixed path) · locked
+contract REPLACES project contract (project-added domain dies under lock).
+Harness: `commit.gpgsign=false`, `core.autocrlf=false`; fake
+`HOME`/`USERPROFILE` in EVERY suite (audit + destructive included); scratch
+dirs gitignored; chmod-before-rm teardown; suite runs green twice in a row.
 
-Regression: lock matrix (ported into `tests/`) + destructive-git smoke
-(in `tests/`) stay green. Wiring test asserts the ship-gate entry exists in
-`hooks.json`'s PreToolUse Bash|PowerShell group with correct command path.
+Regression: lock matrix + destructive-git smoke, both fully inlined
+in-repo under `tests/` (no external references). Wiring test asserts the
+ship-gate entry in `hooks.json`'s PreToolUse Bash|PowerShell group.
 
-Skill-chain check (manual): `/orch:go` phase precedence walks correctly for
-(a) no BRIEF (b) BRIEF only (c) BRIEF+ROUTE (d) evidence-complete
-(e) board-merged; each refusal points backward.
+Skill-chain check (manual): `/orch:go` precedence for (a) no BRIEF
+(b) BRIEF only (c) BRIEF+ROUTE (d) evidence-complete (e) board-merged
+(f) merged + "run overnight" message → closed, not loop.
 
 ## §7 Workflow layer — Brief → Front → Iterations
 
@@ -269,7 +305,8 @@ kill.
 |---|---|
 | `hooks/contract-ship-gate.js` | NEW (~150 ln) |
 | `hooks/hooks.json` | +1 wiring |
-| `hooks/lib/config.js` | + audit append helper + corrupt-config signal |
+| `hooks/lib/config.js` | + audit helper (fixed path) + corrupt-config signal + locked-contract atomic replace |
+| `.gitignore` | NEW — scratch test dirs |
 | `skills/orch/` | REMOVED (renamed) |
 | `skills/go/SKILL.md` | NEW — driver: state machine + route/ship inline |
 | `skills/go/{work,loop}.md` | NEW ×2, heavy phases on demand |
