@@ -5,11 +5,12 @@
 // does (the gateguard insight). No-ops without config.
 //
 // .claude/orch.json:
-//   { "factForce": {
+//   { "readBeforeWrite": {
 //       "pathRegex": "(Solver|Kernel|Pricing)",     // required to activate
 //       "scopeRegex": "(^|[\\\\/])src[\\\\/]",     // optional extra scope
 //       "facts": ["...", "..."]                     // optional, has defaults
 //   } }
+// `factForce` is accepted as a deprecated alias (pre-v0.4.0 configs).
 // Marker TTL 24h: a marker from a dead session must not waive the gate forever.
 // Fail-open by design: this is a gate, not a block — if the marker can't
 // persist or input is abnormal, allow (a permanent deny loop is worse).
@@ -25,7 +26,11 @@ if (!j) process.exit(0);
 const f = (j.tool_input && (j.tool_input.file_path || j.tool_input.filePath)) || '';
 if (!f) process.exit(0);
 
-const cfg = loadConfig(j).factForce || {};
+const all = loadConfig(j);
+if (all.factForce && !all.readBeforeWrite) {
+  console.error('orch: NOTE — "factForce" is the pre-v0.4.0 name; rename it to "readBeforeWrite" in .claude/orch.json.');
+}
+const cfg = all.readBeforeWrite || all.factForce || {};
 if (!cfg.pathRegex) process.exit(0);
 let hot, scope = null;
 try {
@@ -36,7 +41,7 @@ if (!hot.test(f) || (scope && !scope.test(f))) process.exit(0);
 
 const session = j.session_id || 'nosession';
 const key = crypto.createHash('md5').update(session + '|' + f.toLowerCase()).digest('hex');
-const marker = path.join(os.tmpdir(), 'orch-factforce-' + key);
+const marker = path.join(os.tmpdir(), 'orch-rbw-' + key);
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 if (fs.existsSync(marker)) {
@@ -54,7 +59,7 @@ const facts = cfg.facts || [
   'Units/invariants on every quantity touched.',
 ];
 console.error(
-  'FACT-FORCE (first critical-file edit this session — retry passes automatically).\n' +
+  'READ-BEFORE-WRITE (first critical-file edit this session — retry passes automatically).\n' +
   'Before editing ' + path.basename(f) + ', state in the conversation:\n' +
   facts.map((s, i) => `${i + 1}. ${s}`).join('\n')
 );

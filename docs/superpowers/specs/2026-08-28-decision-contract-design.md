@@ -184,7 +184,7 @@ README, not only in block messages.
 | Depth | Artifact | When |
 |---|---|---|
 | audit line | `<repo-root>/.claude/orch-audit.jsonl` — FIXED path, deliberately not configurable (a configurable path was a verified gate bypass: point it at a protected file and the self-exemption ships it); local-first, gitignoring `.claude/` is fine; if tracked, gate-exempt per §2 | EVERY ship-gate exit — ALLOW, BLOCK, and every fail-closed path — `{ts, action, files, domain, verdict, reason?, by:"hook"}`; the skill mirrors Rulings as `{by:"ruling"}` lines |
-| `Ruling:` line | front's dossier + audit mirror | every autonomous decision of consequence: `Ruling: <decision> — <why> — <cost if wrong>` |
+| `Ruling:` line | campaign's worklog + audit mirror | every autonomous decision of consequence: `Ruling: <decision> — <why> — <cost if wrong>` |
 | ADR | `docs/adr/NNNN-<slug>.md`, header `Status: proposed | accepted | rejected | superseded` | anything shaping structure, contracts, or future decisions — including every contract amendment |
 
 ADR authorship and status:
@@ -214,29 +214,29 @@ Plugin skills always namespace as `orch:<name>` (there is no bare `/orch` —
 | Command | Does | When |
 |---|---|---|
 | `/orch:setup` | onboarding ritual: write/edit contract domains (offer lock-file mirroring), `workflow.tools`; ratify/reject proposed ADRs; every contract edit bumps version + cites an ADR | first install on a repo; contract governance |
-| `/orch:goal` | brief ritual (goal · metric · done-condition · domains touched · kill criteria) + shaping route (§7) | new front, or editing a front's goal/metric |
-| `/orch:go` | reads board + dossier + proposed ADRs → decides the current phase by ORDERED precedence → acts → reports ≤5 lines + what's next | the session driver — everything after goal definition |
+| `/orch:goal` | brief ritual (goal · metric · done-condition · domains touched · kill criteria) + shaping route (§7) | new campaign, or editing a campaign's goal/metric |
+| `/orch:go` | reads board + worklog + proposed ADRs → decides the current phase by ORDERED precedence → acts → reports ≤5 lines + what's next | the session driver — everything after goal definition |
 
 `skills/go/SKILL.md` holds the state machine AND the two thin phases
 (route, ship) inline; only the heavy phases load on demand:
 
 | Phase | Precedence (first match wins) | Where |
 |---|---|---|
-| closed | board row `merged` → report and stop; a shipped front never re-enters ship, and a merged front never enters loop | inline |
+| closed | board row `merged` → report and stop; a shipped campaign never re-enters ship, and a merged campaign never enters loop | inline |
 | loop | operator's current message asks for an autonomous run (explicit input, the one non-artifact trigger) | `loop.md` |
 | route | BRIEF exists, no `ROUTE:` line — includes the knowledge-gap re-check: if routing surfaces facts the AI can't derive or verify, the research route (§7) runs before the ROUTE line is written | inline |
 | work | `ROUTE:` line exists, done-condition not yet evidenced in ledger | `work.md` |
 | ship | ledger lines satisfy the BRIEF's done-condition | inline |
-| (none) | no front / no BRIEF → point to `/orch:goal`, stop | inline |
+| (none) | no campaign / no BRIEF → point to `/orch:goal`, stop | inline |
 
 Delegation reference `delegate.md` (loaded from route's tier pick and
 work's dispatch): roles-not-model-names tier table (low = transcription/
 mechanical/recon · mid = prose-brief implementation, fix rounds 1–2 ·
 high = review/adversarial verification · frontier = the orchestrator's own
 judgment, never delegated), the delegation-surface rule (one-shot →
-throwaway subagent with a self-contained brief; brief-after-brief fronts →
+throwaway subagent with a self-contained brief; brief-after-brief campaigns →
 resident pane if the runtime has one, else fresh subagents with the
-dossier as memory; verdicts never below high), subagents never spawn
+worklog as memory; verdicts never below high), subagents never spawn
 reviewers, and fix-loop escalation (resume same implementer rounds 1–2;
 round 3 = fresh implementer one tier up before the stall rule escalates).
 Optional `models` map in orch.json pins roles → the runtime's actual
@@ -244,7 +244,7 @@ model names.
 
 Canonical artifact grammar (single source — every reader/writer uses it
 verbatim):
-- BRIEF (dossier header): `goal:` `metric:` `done:` `domains:` `kill:`
+- BRIEF (worklog header): `goal:` `metric:` `done:` `domains:` `kill:`
 - `ROUTE: <domain> · decide:<ai|human> · ship:<none|commit|push> ·
   tier:<model-tier> · approved:<operator|auto> · <date>` — for
   `decide: human`, the line is written ONLY after operator approval
@@ -288,7 +288,7 @@ the work, so the plan stands on sources, not confident guesses.
 Then: the seven premises condensed, the contract JSON, the 3 commands
 (`/orch:setup`, `/orch:goal`, `/orch:go`), records, the seven-hook table,
 configure, glossary. Plain-language register retained. Enforcement stated
-honestly: the hook wall gates this repo's git commit/push and blocks
+honestly: the guardrails gates this repo's git commit/push and blocks
 history-rewriters; it is not a sandbox.
 
 ## §6 Tests
@@ -327,7 +327,7 @@ Skill-chain check (manual): `/orch:go` precedence for (a) no BRIEF
 (b) BRIEF only (c) BRIEF+ROUTE (d) evidence-complete (e) board-merged
 (f) merged + "run overnight" message → closed, not loop.
 
-## §7 Workflow layer — Brief → Front → Iterations
+## §7 Workflow layer — Brief → Campaign → Iterations
 
 Continuous flow, no timeboxes. The BRIEF format is the interface; the
 shaping tool is routed by `/orch:goal`, not re-decided per task:
@@ -346,14 +346,14 @@ papers, vendor specifics. At `/orch:goal` time (and again at route time if
 work surfaces one), test: does this goal depend on facts the AI can
 neither derive from the repo nor verify from training? If yes, run a
 research pass FIRST; its output lands as a `research:` section in the
-dossier (sources cited, confidence graded), and the BRIEF's `goal:`/
+worklog (sources cited, confidence graded), and the BRIEF's `goal:`/
 `done:` lines cite it. If no, skip — research is a route, never a
 mandatory phase. Authored values without a cited source remain
 never-delegated regardless.
 
 Optional `workflow.tools` map in orch.json overrides defaults. Whatever
-tool runs, its output lands as the BRIEF at the top of the front's dossier.
-Then: front on BOARD.md → iterations (ledger lines) → done-condition or
+tool runs, its output lands as the BRIEF at the top of the campaign's worklog.
+Then: campaign on BOARD.md → iterations (ledger lines) → done-condition or
 kill.
 
 ## Files touched

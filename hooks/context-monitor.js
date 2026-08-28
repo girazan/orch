@@ -10,7 +10,7 @@
 //
 // .claude/orch.json (all optional):
 //   { "contextMonitor": { "window": 200000, "preAlarm": 0.40, "trip": 0.25,
-//       "checkpointHint": "refresh the dossier and HANDOFF" } }
+//       "checkpointHint": "refresh the worklog and HANDOFF" } }
 // Env override: ORCH_CTX_WINDOW.
 'use strict';
 const fs = require('fs');

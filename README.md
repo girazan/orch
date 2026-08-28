@@ -62,7 +62,7 @@ There is no bare `/orch`. [Architecture diagram →](docs/orch-architecture.html
 | 🚢 `contract-ship-gate` | Deny-by-default git surface: every command is refused unless it's read/local or a `commit`/`push` your contract covers — judged by what's actually in your repo, never by the command's arguments. |
 | 💣 `block-destructive-git` | No `push --force`, `reset --hard`, branch deletion, `gh pr merge`, or mutating `gh api`. |
 | 🔒 `block-protected-dirs` | Folders you declare untouchable stay untouchable. |
-| 🔍 `fact-force` | First edit to a critical file is refused until the AI states callers, the test that'd catch a mistake, and the number justifying it. |
+| 🔍 `read-before-write` | First edit to a critical file is refused until the AI states callers, the test that'd catch a mistake, and the number justifying it. |
 | 🧹 `session-hygiene` | No clocking out of a heavy session without writing down what happened. |
 | ⛽ `context-monitor` | Low-fuel gauge: one "finish up" warning, one "save state now". Each fires once. |
 | 🔄 `run-on-commit` | Re-runs a command you choose after each commit, so derived artifacts never go stale. |
@@ -96,8 +96,8 @@ never silently disable a guard.
   "workflow": { "tools": { "research": "your-deep-research-tool" } },
   "models": { "frontier": "opus", "high": "opus", "mid": "sonnet", "low": "haiku" },
   "protectedDirs": ["acceptance"],
-  "factForce": { "pathRegex": "(Solver|Kernel)", "facts": ["Every caller (grep, not memory).", "The red test.", "The reproduced number.", "Units."] },
-  "sessionHygiene": { "trailPaths": ["tmp/dossiers", "docs/BOARD.md"], "minEdits": 8 },
+  "readBeforeWrite": { "pathRegex": "(Solver|Kernel)", "facts": ["Every caller (grep, not memory).", "The red test.", "The reproduced number.", "Units."] },
+  "sessionHygiene": { "trailPaths": ["tmp/worklogs", "docs/BOARD.md"], "minEdits": 8 },
   "contextMonitor": { "window": 200000, "preAlarm": 0.40, "trip": 0.25 },
   "runOnCommit": { "command": "graphify", "args": ["update", "."] },
   "destructiveGit": { "extraPatterns": [{ "pattern": "taskkill\\s+/f\\s+/im", "name": "mass process kill" }] }
@@ -106,16 +106,21 @@ never silently disable a guard.
 
 ## 📖 Glossary
 
-**front** one ongoing piece of work (workstream) · **board** the status
-table, one row per front (kanban) · **dossier** a front's running notebook ·
+**campaign** one ongoing piece of work (workstream) · **board** the status
+table, one row per campaign (kanban) · **worklog** a campaign's running notebook ·
 **ledger line** one-line summary of one work round · **review ladder**
 staged checking, cheap → expensive (quality gates) · **merge gate** the
 three questions before keeping a change (definition of done) · **noise
 clause** moved less than the usual wobble = not an improvement (statistical
-significance) · **hook wall** rules enforced by programs, not by asking
+significance) · **guardrails** rules enforced by programs, not by asking
 nicely (policy-as-code) · **contract** your map of who decides and who
 ships (decision rights / RACI) · **ADR** architecture decision record ·
 **ship grant** how far the AI may push on its own (deploy permission).
+
+**Renamed in v0.4.0** (if you saw the earlier version): front → campaign ·
+dossier → worklog · hook wall → guardrails · judge independence → independent
+reviewer · fact-force → read-before-write (config key `factForce` still
+works, with a notice).
 
 ## 🙏 Lineage
 

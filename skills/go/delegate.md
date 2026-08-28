@@ -30,7 +30,7 @@ implementers and reviewers.
 | Work shape | Vehicle |
 |---|---|
 | one-shot: read, scan, verify, single task with a clean brief | throwaway subagent — spawns, reports, exits; brief carries EVERYTHING it needs (it inherits nothing) |
-| a front taking brief after brief — context worth keeping alive between briefs | resident pane (herdr-style) if your runtime has one: a ROLE with a name and a lifetime tied to the front. No resident runtime → fresh subagents with the DOSSIER as the persistent memory |
+| a campaign taking brief after brief — context worth keeping alive between briefs | resident pane (herdr-style) if your runtime has one: a ROLE with a name and a lifetime tied to the campaign. No resident runtime → fresh subagents with the WORKLOG as the persistent memory |
 | verdicts, gates, plan changes | never delegated below high; the orchestrator interprets every verdict itself |
 
 Subagents never spawn their own reviewers — review comes from the

@@ -3,7 +3,7 @@
 Always a PROPOSAL — present the plan, get explicit approval, then launch.
 Preflight is unskippable.
 
-Topology check first (advisory): loop-shaped = multiple uncertain
+Preflight 0 — shape check (advisory): loop-shaped = multiple uncertain
 iterations against a metric. Single-pass or 2-3 known steps → say so, do
 it directly.
 
@@ -14,13 +14,13 @@ Refuse to launch until all five hold (any ✗ → fix the prompt file first):
    authored values, the gates, the contract).
 3. Iteration cap AND spend budget — the loop dies on whichever trips
    first, not only when context runs low.
-4. Judge independence — external check output, never self-grading.
+4. Independent reviewer — external check output, never self-grading.
 5. Numeric ambiguity checklist (binary): inputs + units · oracle ·
    tolerance vs noise band · measurement protocol · abort conditions.
 
 In-loop: structure/contract-shaped calls → proposed ADR; if the work
-depends on the answer, park the front and continue elsewhere. The
+depends on the answer, park the campaign and continue elsewhere. The
 ship-gate caps what the loop lands regardless of what it believes.
 
-Launch journal, in the dossier:
+Launch journal, in the worklog:
 `LAUNCH <date> · <prompt file> · max-iter <n> · budget <tokens> · promise <string>`

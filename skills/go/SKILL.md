@@ -1,8 +1,8 @@
 ---
 name: go
 description: >
-  The orch session driver. Use for any work session after a front exists:
-  reads the board, dossiers, contract, and unratified ADRs, decides the
+  The orch session driver. Use for any work session after a campaign exists:
+  reads the board, worklogs, contract, and unratified ADRs, decides the
   current phase (route/work/ship/loop) by ordered precedence, acts, and
   reports. The human decides only what the contract reserves for them.
 ---
@@ -16,16 +16,16 @@ judgment, verdict-only; suited cheap models execute.
 
 ## On every invocation
 
-1. Read: `docs/BOARD.md` · the active front's dossier · `docs/adr/` for
+1. Read: `docs/BOARD.md` · the active campaign's worklog · `docs/adr/` for
    `Status: proposed` · the contract.
-2. Report ≤5 lines: front, phase, blockers, unratified ADRs, parked items.
+2. Report ≤5 lines: campaign, phase, blockers, unratified ADRs, parked items.
 3. Decide the phase — ORDERED, first match wins:
 
 | # | Condition | Phase |
 |---|---|---|
-| 1 | board row `merged` | closed → report, stop; a merged front never re-enters ship or loop |
+| 1 | board row `merged` | closed → report, stop; a merged campaign never re-enters ship or loop |
 | 2 | operator's message asks for an autonomous run | loop → load `loop.md` |
-| 3 | no front / no BRIEF | → point to `/orch:goal`, stop |
+| 3 | no campaign / no BRIEF | → point to `/orch:goal`, stop |
 | 4 | BRIEF, no `ROUTE:` line | route (below) |
 | 5 | `ROUTE:` exists, done-condition not evidenced | work → load `work.md` |
 | 6 | ledger satisfies the BRIEF's `done:` | ship (below) |
@@ -36,7 +36,7 @@ steps are visible, never silent.
 ## The board
 
 Canonical file: `docs/BOARD.md` — git-tracked. Edit the row and COMMIT it
-whenever a front's status or blocker changes: an uncommitted board edit is
+whenever a campaign's status or blocker changes: an uncommitted board edit is
 an unrecorded one, and `git log` on the file is the campaign journal.
 
 Status vocabulary: **ready** (shaped, unowned) · **running** · **review**
@@ -44,10 +44,10 @@ Status vocabulary: **ready** (shaped, unowned) · **running** · **review**
 unblocking it) · **needs_attention** (work ended without evidence — see
 phase: ship) · **merged**.
 
-Board-theater rule: a front sitting blocked for more than a session with no
+Board-theater rule: a campaign sitting blocked for more than a session with no
 named unblock-owner is board theater — surface it, don't recite past it.
 
-Detail lives in dossiers, never the board.
+Detail lives in worklogs, never the board.
 
 ## The contract
 
@@ -71,12 +71,12 @@ Detail lives in dossiers, never the board.
 
 ## Phase: route
 
-1. Classify the front's intended change per the contract rules above.
+1. Classify the campaign's intended change per the contract rules above.
 2. Knowledge-gap re-check: if routing surfaces facts you can neither
    derive from the repo nor verify from training (post-cutoff APIs, niche
    domain facts, vendor specifics), run the research route (see
    /orch:goal's shaping table) BEFORE writing the ROUTE line; cite its
-   findings note in the dossier.
+   findings note in the worklog.
 3. Execution shape: number+cause-unknown → measurement-first iteration ·
    mechanical/spec-complete → cheapest tier, single review ·
    judgment-heavy/high-consequence → mid-tier implement + dual review.
@@ -84,7 +84,7 @@ Detail lives in dossiers, never the board.
 4. `decide: human` → present plan ≤5 lines, STOP; write the ROUTE line
    only on approval, with `approved:operator`. `decide: ai` → write it
    with `approved:auto`.
-5. Append to the dossier, exactly:
+5. Append to the worklog, exactly:
    `ROUTE: <domain> · decide:<ai|human> · ship:<none|commit|push> · tier:<model-tier> · approved:<operator|auto> · <date>`
    Then enter phase work.
 
@@ -93,7 +93,7 @@ Detail lives in dossiers, never the board.
 1. Merge gate — all three legs, or park for the operator:
    ① No regression — the full relevant suite, from the real runner's
    verdict line, never a filtered/wrapped view. ② Measured improvement on
-   the front's metric, exceeding its documented noise band — inside the
+   the campaign's metric, exceeding its documented noise band — inside the
    band is INCONCLUSIVE → parks; "flat but correct" and hygiene-only park.
    ③ Root cause, no band-aid — symptom-masking stops for the operator
    regardless of green gates.
