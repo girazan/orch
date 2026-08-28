@@ -1,0 +1,43 @@
+# Phase: work (ROUTE: exists, done-condition not evidenced)
+
+Delegate execution to the tier named in the ROUTE: line. Reviewers are
+verdict-only — a reviewer never implements the fix it proposes. Never
+delegated: protected-directory edits, authored values without a cited
+source, judgment the contract reserves for the operator.
+
+## Review ladder (per hand-back — order is mandatory)
+
+1. MECHANICAL first, cheap tier: empty-result check before anything — if
+   the claimed diff is empty or a claimed artifact absent/zero-length,
+   auto-FAIL; "ran, produced nothing" never costs a review round. Then
+   `git diff --stat` + build + scoped tests. Fail → back to implementer.
+   Test-touching hand-backs also get the test-quality audit: ①
+   circular-oracle check (a test deriving expected values from the code
+   under test proves nothing) ② assertion-strength ladder (existence →
+   type → status → value → behavioral; consequential verdicts need
+   value-or-behavioral) ③ disabled-test scan (skips found in review are
+   findings).
+2. JUDGMENT second: diff review, strongest model, verdict-only.
+   High-consequence hand-backs get a second reviewer from a DIFFERENT
+   model family in a FRESH context, same rubric. Verdicts tri-state:
+   PASS / FAIL / INCONCLUSIVE — INCONCLUSIVE holds for the operator, no
+   auto-retry, no round consumed. Both must PASS; one FAIL fails; one
+   INCONCLUSIVE holds. Artifact reality check: claimed additions pass
+   EXISTS → SUBSTANTIVE → WIRED.
+3. LOOP: on FAIL the implementer (never a reviewer) fixes ONLY flagged
+   items; step 2 re-runs fresh. Initial review = round 1; cap 3. Stall
+   (identity-based, never count-based): a previous-round finding survives,
+   or a new equal-or-higher-severity finding appears → escalate. Never
+   merge dirty.
+
+## Record discipline
+
+Every iteration entry starts:
+`iter <n> · <short-sha> · <before> → <after> · keep|revert|flat|refuted · <what>`
+then prose: hypothesis (written BEFORE the change), what changed, every
+number, verdict. Consequential autonomous calls:
+`Ruling: <decision> — <why> — <cost if wrong>` + audit mirror.
+Simplicity criterion: improvement bought with disproportionate complexity
+→ flag `⚠complexity`; a flat result that DELETED code is a win — keep it.
+
+Ledger satisfies the BRIEF's `done:` → return to the driver, phase ship.
