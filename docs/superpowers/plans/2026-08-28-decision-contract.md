@@ -1,4 +1,25 @@
-# Decision Contract (orch v0.3.0) Implementation Plan — rev 3
+# Decision Contract (orch v0.3.0) Implementation Plan — rev 3 (+rev-4 delta)
+
+> **REV-4 DELTA (round-3 fixes, operator-approved, applied during the
+> build — the code in the repo is authoritative where it differs from the
+> rev-3 listings below):** ① retarget = any unquoted dir-changing token
+> (`cd|chdir|pushd|popd|sl|Set-Location|Push-Location`) anywhere +
+> grouping/keyword separators (`{}()`, `then|do|else|fi|done|if|for|while`)
+> split segments; segments built from a quote-aware token stream so quoted
+> text never creates or hides a segment. ② READ_ALLOW pruned: submodule,
+> worktree, clone, init, archive, format-patch, remote, config, clean
+> removed. ③ gh policing cut from ship-gate; `gh pr merge` + mutating
+> `gh api` become built-in `block-destructive-git` rules. ④ `commit
+> --amend` denied outright (amend-union deleted). ⑤ push base chain gains
+> `ls-remote --symref origin HEAD` before merge-base (first-push
+> workflow). ⑥ audit file filtered from the resolved set (absent from
+> logged files); oversized path audits only when a root resolves from
+> `process.cwd()`. ⑦ git subprocess stderr captured, never inherited.
+> ⑧ matrix: gh checks move to test-destructive; add submodule-foreach,
+> remote set-url, config, Push-Location/sl/brace retargets, quoted-`;`
+> message commit, --amend denial, ls-remote first-push, no-remote die;
+> exemption check asserts the no-`.claude/**`-domain ALLOW, not the files
+> array. ⑨ README carries the deny-by-default disclosure list (spec §2).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

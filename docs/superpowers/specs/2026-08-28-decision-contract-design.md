@@ -1,7 +1,8 @@
 # orch v0.3.0 — The Decision Contract
 
-Date: 2026-08-28 · Status: rev 5 — round-2 dual review (both FAIL) triggered
-the stall rule; operator approved the deny-by-default redesign of §2
+Date: 2026-08-28 · Status: rev 6 — round-3 review (Opus, empirical; Codex
+run died) FAIL with converged scope; operator chose fix-and-build. Final
+document review; the built artifact gets a fresh code review.
 
 ## Premise
 
@@ -15,8 +16,9 @@ hooks.
 ## §1 Contract schema
 
 `.claude/orch.json` at the REPO ROOT (discovered via `git rev-parse
---show-toplevel`; nested `.claude/orch.json` files are never consulted —
-a subdirectory config must not shadow the governing contract). **Security
+--show-toplevel` and consulted first; if the root has no orch.json the
+loader's `process.cwd()` fallback can only ADD gating — a contract found
+there activates the gate; it can never deactivate a root contract). **Security
 note:** the project file is agent-writable; `/orch:setup` offers to mirror
 the contract into `~/.claude/orch-lock.json`. A locked `contract` REPLACES
 the project's contract block atomically (never merged key-by-key — an
@@ -75,47 +77,71 @@ DENY-BY-DEFAULT, and file resolution NEVER parses command arguments.
 classification, then resolution. All git calls use
 `-c core.quotePath=false`.
 
-**Classification — per segment (`|`, `;`, `&`, newline), quote-preserving
-tokenizer** (`"…"`/`'…'` content survives as one token — quoted refspecs
-and pathspecs are seen, not deleted):
+**Classification — quote-aware end to end.** The WHOLE command is
+tokenized first (`"…"`/`'…'` spans become single tokens carrying their
+content); segments are then built by splitting the TOKEN STREAM on
+unquoted separators — `|`, `;`, `&`, newline, and the grouping/keyword
+forms `{`, `}`, `(`, `)`, `then`, `do`, `else`, `fi`, `done`, `if`,
+`for`, `while`. Quoted text can therefore never create a segment
+(`git commit -m "wip; git push later"` is ONE commit segment) and
+grouping can never hide one (`{ cd x && git push; }` splits).
 - Per git segment, the SUBCOMMAND is the first non-flag token after the
-  git word (`-c` skips its value). A subcommand containing quote characters
-  or `$` is never a known word → falls to deny.
+  git word (`-c` skips its value). A subcommand containing quotes or `$`
+  is never a known word → falls to deny.
 - READ/LOCAL ALLOWLIST (segment ignored): status · log · diff · show ·
   fetch · add · rm · mv · restore · switch · checkout · branch · stash ·
   rev-parse · ls-files · ls-remote · describe · blame · shortlog · reflog ·
-  remote · worktree · submodule · init · clone · config · clean · grep ·
-  apply · format-patch · archive · help · version. (Destructive variants
-  stay covered by `block-destructive-git`.)
+  grep · apply · help · version. Round-3 prune, entries REMOVED because
+  they can ship or retarget: `submodule` (`foreach 'git push'`) ·
+  `worktree` · `clone` · `init` · `archive` · `format-patch` · `remote`
+  (`set-url origin` redirects approved pushes) · `config` (aliases,
+  push.default) · `clean`.
 - GATED: `commit` (rank 1) · `push` (rank 2). Required grant = MAX rank
-  across all segments (`git commit && git push` requires push).
+  across all segments. `commit --amend` is DENIED, not gated — it is a
+  history rewrite; the amend-union code path does not exist.
 - EVERYTHING ELSE — merge, rebase, cherry-pick, revert, am, pull, tag,
-  aliases, unknown or quote-mangled subcommands — fail CLOSED: "not on the
-  contract's git surface; the operator runs it, or an ADR grants it."
-- A gated/denied segment anywhere + `cd`/`pushd`/`Set-Location`/`GIT_DIR`/
-  `GIT_WORK_TREE` anywhere in the command → fail CLOSED (retargeting).
-  Same for `-C`/`--git-dir`/`--work-tree` on a non-allowlisted git segment.
-- `gh` segments: verbs view/list/status/checks/diff allowed; any other gh
-  verb (merge, create, edit, api, workflow, release, …) → fail CLOSED
-  (`gh api PUT /contents` is a remote commit).
+  aliases, unknown or quote-mangled subcommands — fail CLOSED.
+- RETARGET RULE (final form, round-3): any unquoted token matching
+  `cd|chdir|pushd|popd|sl|Set-Location|Push-Location` ANYWHERE in the
+  command, or `GIT_DIR`/`GIT_WORK_TREE` appearing ANYWHERE in the raw
+  string, while any gated/denied action exists → fail CLOSED. Same for
+  `-C`/`--git-dir`/`--work-tree` on a non-allowlisted git segment.
+  Enumerating shell forms lost three review rounds in a row; the rule is
+  now "any directory-changing token", not a list of spellings we've seen.
+- `gh` is NOT this hook's concern (round-3 cut — wrong layer, leaky both
+  ways). The remote-ship holes it covered move to `block-destructive-git`
+  as two built-in denylist rules: `gh pr merge` and `gh api` with a
+  mutating method (`-X POST|PUT|PATCH|DELETE` / `--method …`).
 
 **File resolution — repo STATE, never command arguments:**
 - `commit` → staged ∪ unstaged-tracked (`diff --cached --name-only` ∪
-  `diff --name-only`); `--amend` present → also ∪ `diff HEAD^ HEAD`.
-  Always-union is deliberate: it is a strict superset of every commit
-  variant (`-a`, pathspec, `--only`, `--include`, quoted paths), so no
-  argument parsing exists to bypass. Consequence, stated plainly: a dirty
-  human-domain file blocks ANY commit until dealt with — fail-closed's
-  honest price.
+  `diff --name-only`). Always-union is deliberate: a strict superset of
+  every commit variant (`-a`, pathspec, `--only`, `--include`, quoted
+  paths), so no argument parsing exists to bypass. Consequence, stated
+  plainly: a dirty human-domain file blocks ANY commit until dealt with —
+  fail-closed's honest price.
 - `push` → the commit set ∪ `diff <base>..HEAD --name-only` (diff, never
-  log) where `<base>` = `@{push}` → `@{u}` → merge-base with the remote
-  default branch. None resolvable → fail CLOSED. Push args beyond a narrow
-  shape (flags outside `-u`/`--set-upstream`/`-q`/`--quiet`/`-v`/
-  `--verbose`; any token with `:`; >2 positionals; positional 2 ≠ current
-  branch) → fail CLOSED.
+  log) where `<base>` = `@{push}` → `@{u}` → `symbolic-ref
+  refs/remotes/origin/HEAD` → **`ls-remote --symref origin HEAD`** (round
+  3: neither init+remote-add nor clone reliably creates origin/HEAD, and
+  without this fallback the first push of every branch — the normal agent
+  workflow — was dead) → merge-base with the resolved default. None
+  resolvable → fail CLOSED ("the first push is the operator's"). Push args
+  beyond a narrow shape (flags outside `-u`/`--set-upstream`/`-q`/
+  `--quiet`/`-v`/`--verbose`; any token with `:` — quoted included; >2
+  positionals; positional 2 ≠ current branch/HEAD) → fail CLOSED.
+- The audit file is filtered OUT of the resolved set right after
+  resolution — it is exempt from domain mapping AND absent from logged
+  `files` arrays; if it was the only pending file, that is the
+  "nothing gateable" die.
+- Git subprocess stderr is captured, never inherited — a blocked push
+  prints ONE message: ours.
 
-**Fail-closed inventory (exit 2, EVERY exit audited — unconditionally,
-with `process.cwd()` fallback when no root/config is loadable):** oversized
+**Fail-closed inventory (exit 2, EVERY exit audited when a repo root is
+resolvable — the oversized/no-payload path resolves root from
+`process.cwd()` via rev-parse and SKIPS the audit line, with a stderr
+note, when no root exists; an audit written into an unrelated directory
+is worse than none):** oversized
 payload · root `.claude/orch.json` unparseable · `contract` key present but
 invalid (own-property enum checks; `domains` must be a plain object of
 valid entries — `{"contract":{}}` is invalid, not inactive) · denied
@@ -134,6 +160,15 @@ the shell tool. Indirection the string doesn't reveal — scripts that run
 git, interpreters, binaries — is out of scope by design; the lock file,
 the read-allowlist's deny-by-default posture, and the operator are the
 lines behind it.
+
+**Disclosure (README-mandatory):** deny-by-default costs the agent,
+daily: `pull` · `merge` (incl. `--continue`) · `rebase` · `cherry-pick` ·
+`revert` · `am` · `tag` · `commit --amend` · every git alias · `remote` /
+`config` / `submodule` / `worktree` subcommands · any push when nothing
+is pending · any commit while a human-domain file is dirty · the first
+push of a branch when no remote default is resolvable. Each block names
+the operator as the override. This list ships in the README, not only in
+block messages.
 
 ## §3 Decision records — one system, three depths
 
@@ -303,7 +338,8 @@ kill.
 
 | File | Change |
 |---|---|
-| `hooks/contract-ship-gate.js` | NEW (~150 ln) |
+| `hooks/contract-ship-gate.js` | NEW (~170 ln) |
+| `hooks/block-destructive-git.js` | +2 built-in rules: `gh pr merge`, mutating `gh api` |
 | `hooks/hooks.json` | +1 wiring |
 | `hooks/lib/config.js` | + audit helper (fixed path) + corrupt-config signal + locked-contract atomic replace |
 | `.gitignore` | NEW — scratch test dirs |
