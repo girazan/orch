@@ -205,6 +205,13 @@ check('30. git rebase main -> 2', run('git rebase main').code === 2);
 check('31. git cherry-pick abc -> 2', run('git cherry-pick abc').code === 2);
 check('32. git revert HEAD -> 2', run('git revert HEAD').code === 2);
 check('33. git am patch -> 2', run('git am patch').code === 2);
+// Pruned-from-READ_ALLOW subcommands (delta #3) — lock the denial in.
+check('git worktree list -> 2 (denied)', run('git worktree list').code === 2);
+check('git clone x -> 2 (denied)', run('git clone x').code === 2);
+check('git init -> 2 (denied)', run('git init').code === 2);
+check('git archive HEAD -> 2 (denied)', run('git archive HEAD').code === 2);
+check('git format-patch -1 -> 2 (denied)', run('git format-patch -1').code === 2);
+check('git clean -n -> 2 (denied)', run('git clean -n').code === 2);
 
 writeFile('docs/d34.md');
 g('add', 'docs/d34.md');
@@ -231,6 +238,18 @@ check('49. push --tags -> 2', run('git push --tags').code === 2);
 check('50. push --delete br -> 2', run('git push --delete br').code === 2);
 check('51. push --force -> 2', run('git push --force').code === 2);
 check('52. push --follow-tags (unknown flag) -> 2', run('git push --follow-tags').code === 2);
+
+// CRITICAL-1 regression: every push segment must be shape-checked, not just
+// the last one — a bad refspec push followed by a clean plain push must
+// still die (previously the clean segment's slot overwrote the bad one's).
+check('git push origin a:b && git push -> 2 (every push segment checked)', run('git push origin a:b && git push').code === 2);
+
+// IMPORTANT-1 regression: path-prefixed git invocations must not bypass the
+// gate — match on the token's basename, not the literal string "git".
+writeFile('src/core/pathgit.js');
+g('add', 'src/core/pathgit.js'); // core domain: ship:none — any push must be blocked
+check('/usr/bin/git push -> 2 (path-prefixed git not a bypass)', run('/usr/bin/git push').code === 2);
+cleanTree();
 
 writeFile('docs/d53.md');
 g('add', 'docs/d53.md'); g('commit', '-m', 'd53'); // unpushed, docs domain (push grant)

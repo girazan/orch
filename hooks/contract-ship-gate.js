@@ -72,9 +72,13 @@ function toSegments(command) {
 }
 
 const CD_RE = /^(cd|chdir|pushd|popd|sl|set-location|push-location)$/i;
+// Match the invoked token's BASENAME, not the literal string "git" — a
+// path-prefixed invocation (`/usr/bin/git`, `./git`, a quoted absolute
+// .exe path) is still git and must not walk past every check below it.
+const GIT_RE = /(^|[\\/])git(\.exe)?$/i;
 
 function classify(command) {
-  const res = { action: 0, denied: null, retarget: false, pushSeg: null };
+  const res = { action: 0, denied: null, retarget: false, pushSegs: [] };
   const hasEnvRetarget = /GIT_DIR|GIT_WORK_TREE/.test(command);
   const segs = toSegments(command);
   // Retarget-token scan is command-wide, not per-segment: `{ cd ../victim
@@ -82,7 +86,7 @@ function classify(command) {
   const hasCd = segs.some(seg => seg.some(tok => !tok.quoted && CD_RE.test(tok.text)));
   for (const seg of segs) {
     const t = seg.map(x => x.text);
-    const gi = t.findIndex(x => /^git(\.exe)?$/i.test(x));
+    const gi = t.findIndex(x => GIT_RE.test(x));
     if (gi < 0) continue;
     let sub = null, subIdx = -1, retargetFlag = false;
     for (let i = gi + 1; i < t.length; i++) {
@@ -102,7 +106,7 @@ function classify(command) {
       else res.action = Math.max(res.action, 1);
     } else if (sub === 'push') {
       res.action = Math.max(res.action, 2);
-      res.pushSeg = t.slice(subIdx + 1);
+      res.pushSegs.push(t.slice(subIdx + 1)); // EVERY push segment, not just the last
     } else {
       // Unknown, aliased, or history-writing subcommand.
       res.denied = res.denied || `git ${sub}`;
@@ -182,16 +186,19 @@ function names(out) {
 }
 
 if (cls.action === 2) {
-  // Narrow push shape, evaluated on quote-preserved tokens.
+  // Narrow push shape, checked on EVERY push segment in the command — a
+  // single bad segment (e.g. a refspec push hiding behind a second, clean
+  // `git push`) must not slip through because only the last one was checked.
   const ALLOWED_FLAGS = new Set(['-u', '--set-upstream', '-q', '--quiet', '-v', '--verbose']);
-  const pt = cls.pushSeg || [];
-  const flags = pt.filter(x => x.startsWith('-'));
-  const pos = pt.filter(x => !x.startsWith('-'));
   let branch = null;
   try { branch = git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).trim(); } catch {}
-  if (flags.some(f => !ALLOWED_FLAGS.has(f)) || pt.some(x => x.includes(':')) ||
-      pos.length > 2 || (pos.length === 2 && pos[1] !== branch && pos[1] !== 'HEAD')) {
-    die('push arguments outside the narrow shape (plain / <remote> / -u <remote> <current-branch>) — the operator runs it.');
+  for (const pt of cls.pushSegs) {
+    const flags = pt.filter(x => x.startsWith('-'));
+    const pos = pt.filter(x => !x.startsWith('-'));
+    if (flags.some(f => !ALLOWED_FLAGS.has(f)) || pt.some(x => x.includes(':')) ||
+        pos.length > 2 || (pos.length === 2 && pos[1] !== branch && pos[1] !== 'HEAD')) {
+      die('push arguments outside the narrow shape (plain / <remote> / -u <remote> <current-branch>) — the operator runs it.');
+    }
   }
 }
 
