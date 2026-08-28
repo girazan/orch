@@ -40,6 +40,7 @@ function readStdin() {
 
 function loadConfig(j) {
   let cfg = {};
+  let corrupt = false;
   const roots = [];
   if (j && j.cwd) roots.push(j.cwd);
   roots.push(process.cwd());
@@ -49,13 +50,33 @@ function loadConfig(j) {
       if (fs.existsSync(p)) { cfg = JSON.parse(fs.readFileSync(p, 'utf8')); break; }
     } catch {
       // Bad config never breaks a hook — but silently losing the guards the
-      // user configured is worse than noise. Warn (stderr on exit 0 is
-      // non-blocking) and fall back to defaults.
+      // user configured is worse than noise. Warn; blocking hooks see the
+      // corruption and fail closed instead of running ungated.
       console.error(`orch: WARNING — ${p} is not valid JSON; configured guards are INACTIVE until fixed.`);
+      corrupt = true;
+      break;
     }
   }
   const lock = loadLock();
-  return lock ? deepMerge(cfg, lock) : cfg;
+  let out = lock ? deepMerge(cfg, lock) : cfg;
+  // A locked contract REPLACES the project's — an additive merge would let
+  // the agent-writable project file add permissive domains beside it.
+  if (lock && Object.prototype.hasOwnProperty.call(lock, 'contract')) out.contract = lock.contract;
+  if (corrupt) Object.defineProperty(out, '__corrupt', { value: true });
+  return out;
 }
 
-module.exports = { readStdin, loadConfig };
+const AUDIT_REL = path.join('.claude', 'orch-audit.jsonl');
+
+function appendAudit(root, entry) {
+  // Audit is best-effort evidence, never a point of failure for the hook.
+  const p = path.resolve(root || process.cwd(), AUDIT_REL);
+  try {
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.appendFileSync(p, JSON.stringify({ ts: new Date().toISOString(), ...entry }) + '\n');
+  } catch (e) {
+    console.error(`orch: WARNING — audit write failed (${p}): ${e.message}`);
+  }
+}
+
+module.exports = { readStdin, loadConfig, appendAudit, AUDIT_REL };
