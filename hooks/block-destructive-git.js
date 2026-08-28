@@ -36,6 +36,9 @@ const rules = [
   [new RegExp(G + '\\bclean\\b' + SEG + '\\s(-\\w*f|--force)'), 'git clean -f/--force'],
   [new RegExp(G + '\\bstash\\s+(pop|drop|clear)\\b'), 'git stash pop/drop/clear (refs/stash is SHARED across every worktree)'],
   [new RegExp(G + '\\b(checkout|restore)\\b' + SEG + '\\s(--\\s+)?\\.\\/?(\\s|$)'), 'git checkout/restore . (mass discard of working tree)'],
+  // Remote ships that bypass any local git gate (round-3 review):
+  [new RegExp('\\bgh\\b' + SEG + '\\bpr\\b' + SEG + '\\bmerge\\b'), 'gh pr merge (remote merge)'],
+  [new RegExp('\\bgh\\b' + SEG + '\\bapi\\b' + SEG + '(-X\\s*|--method[\\s=]+)(POST|PUT|PATCH|DELETE)\\b', 'i'), 'gh api with mutating method'],
 ];
 for (const extra of cfg.extraPatterns || []) {
   try { rules.push([new RegExp(extra.pattern), extra.name || extra.pattern]); } catch { /* bad user regex ignored */ }
