@@ -55,7 +55,7 @@ One file, `.claude/orch.json`, at your repo root:
 
 There is no bare `/orch`. [Architecture diagram →](docs/orch-architecture.html)
 
-## 🧱 Seven hooks — enforced, not remembered
+## 🧱 Eight hooks — enforced, not remembered
 
 | Hook | Plain meaning |
 |---|---|
@@ -64,6 +64,7 @@ There is no bare `/orch`. [Architecture diagram →](docs/orch-architecture.html
 | 🔒 `block-protected-dirs` | Folders you declare untouchable stay untouchable. |
 | 🔍 `read-before-write` | First edit to a critical file is refused until the AI states callers, the test that'd catch a mistake, and the number justifying it. |
 | 🧹 `session-hygiene` | No clocking out of a heavy session without writing down what happened. |
+| 📡 `fleet-context` | Watches your *delegates'* fuel gauges, not just your own: one alert per band as an agent burns context, telling you to bank its state before autocompaction takes the choice away. Point it at any fleet CLI. |
 | ⛽ `context-monitor` | Low-fuel gauge: one "finish up" warning, one "save state now". Each fires once. |
 | 🔄 `run-on-commit` | Re-runs a command you choose after each commit, so derived artifacts never go stale. |
 
@@ -99,6 +100,7 @@ never silently disable a guard.
   "readBeforeWrite": { "pathRegex": "(Solver|Kernel)", "facts": ["Every caller (grep, not memory).", "The red test.", "The reproduced number.", "Units."] },
   "sessionHygiene": { "trailPaths": ["tmp/worklogs", "docs/BOARD.md"], "minEdits": 8 },
   "contextMonitor": { "window": 200000, "preAlarm": 0.40, "trip": 0.25 },
+  "fleetContext": { "listCmd": "herdr agent list --json", "readCmd": "herdr agent read {name} --source visible", "pattern": "ctx:([0-9]+)%", "threshold": 40 },
   "runOnCommit": { "command": "graphify", "args": ["update", "."] },
   "destructiveGit": { "extraPatterns": [{ "pattern": "taskkill\\s+/f\\s+/im", "name": "mass process kill" }] }
 }

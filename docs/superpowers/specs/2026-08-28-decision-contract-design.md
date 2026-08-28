@@ -262,6 +262,22 @@ Carried over unchanged from v0.2.0: board vocabulary incl. needs_attention
 verdicts, identity-based stall), merge gate + noise clause, preflight,
 handoff/session-end.
 
+## §4b Fleet context watchdog (v0.5.0)
+
+`hooks/fleet-context.js`, Stop hook, advisory-only, no-op without
+`fleetContext.listCmd`. Debounced (`pollSeconds`, default 120) because Stop
+fires every turn. Reads operator-named commands — `listCmd`, optional
+`readCmd` with `{name}` substitution, `pattern` capturing percent-used — so
+the plugin ships a policy, not a herdr dependency, and a status-line
+restyle is a config edit rather than a release. Alerts once per band
+(`threshold` 40, `band` 10) per agent per session; state in tmp. Silent on
+every failure: missing CLI, bad JSON, bad regex, timeout, no match.
+
+The alert's prescribed action is the kill/restart doctrine in
+`skills/go/delegate.md` (bank before kill · three restart triggers ·
+asset-vs-liability resume test · lifetime tied to the campaign · what a
+replacement's brief carries). Detection here, doctrine there.
+
 ## §5 README reframe
 
 Opens with the symmetric-limits frame (operator-authored, rephrased):

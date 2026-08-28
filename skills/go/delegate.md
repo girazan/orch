@@ -36,6 +36,29 @@ implementers and reviewers.
 Subagents never spawn their own reviewers — review comes from the
 orchestrator after the hand-back, or it double-pays every seat.
 
+## Killing and restarting a delegate
+
+1. **Bank before kill — hard rule.** An agent's context dies with it and
+   is unrecoverable. Before ANY termination its state is in the worklog:
+   what's done, what's next, what it learned that the diff doesn't show.
+   No bank, no kill. If it is too far gone to write one, YOU write it from
+   its last report.
+2. **Restart triggers — exactly three.** Fuel: a fleet-context band
+   crossing with work remaining. Stall: a previous-round finding survived
+   (the review ladder's identity rule — it now also means "restart"). Role
+   change: the brief's shape changed; a new job gets a new agent, not a
+   re-brief of one shaped for the old job.
+3. **Resume vs fresh — is its context an ASSET or a LIABILITY?** It wrote
+   the code and knows its own choices → resume. It cannot see its own
+   error, or the thread is long and full of dead ends → fresh, one tier up.
+4. **Lifetime = the campaign.** A resident worker exists for one campaign.
+   Campaign hits `merged` or killed → tear the worker down that same turn.
+   An idle resident is cost without benefit; a stale one is worse — it
+   answers from a world that moved.
+5. **The replacement's brief** carries the brief, the worklog path, and
+   WHY its predecessor ended. Never "continue what they were doing": that
+   inherits the confusion without the context that explained it.
+
 ## Fix-loop escalation (matches the review ladder's cap 3)
 
 Rounds 1–2: RESUME the same implementer — its context holds the task and
