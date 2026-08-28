@@ -1,13 +1,14 @@
 # orch
 
-Evidence-gated orchestration for Claude Code. Built by a process engineer and
-Claude for running agents on a production-adjacent numerics codebase, where
-"the agent said it's done" is not evidence and a wrong merge costs real
-measurement time.
+Make your AI prove its work. Built by a process engineer and Claude for a
+codebase where a wrong "looks good, merged!" costs real time and real money —
+and shaped so you don't need a software-engineering background to use it.
 
-**The premise:** an agent's DONE is a claim. This plugin turns claims into
-evidence at four gates — routing, review, merge, loop launch — and enforces
-the boundaries with deterministic hooks instead of prompt prose.
+**The premise:** when an AI says "done", that's a claim, not proof. This
+plugin checks the claim at four moments — before work starts, when work comes
+back, before a change is kept, and before the AI runs unattended — and the
+most important rules are enforced by small programs (hooks) the AI *cannot*
+talk its way past, instead of polite instructions it might forget.
 
 ```
  route ──▶ implement ──▶ ①mechanical ──▶ ②judgment ──▶ ③loop(≤3) ──▶ merge gate
@@ -27,22 +28,34 @@ the boundaries with deterministic hooks instead of prompt prose.
 
 ## What you get
 
-**One skill** — `/orch`: the operating contract. Review ladder (mechanical →
-judgment → capped loop), 3-leg merge gate with a measurement-noise clause,
-board conventions (a tracked `BOARD.md` whose git history is the campaign
-journal), ledger-line + `Ruling:` record discipline, a five-check preflight
-for autonomous loops, and a fixed handoff shape.
+**One skill** — `/orch`: the working agreement your AI follows. In plain terms:
 
-**Six hooks** — deterministic enforcement:
+- **Check work in stages** — cheap checks (does it build? do tests pass?)
+  before expensive ones (careful review). For risky changes, a *second* AI
+  from a different model family reviews in a fresh conversation — because an
+  AI re-reading its own thread only confirms what it already believed.
+- **Three questions before any change is kept:** did anything break? did the
+  number actually get better — by more than the measurement's usual jitter?
+  did we fix the cause, or hide the symptom? Any "no" → a human decides.
+- **A status board that can't lie** — one tracked `BOARD.md` file, updated by
+  commit, so its git history *is* the project diary.
+- **Everything written down** — one summary line per work round, and any
+  decision the AI made alone gets a `Ruling:` line (what it decided, why, and
+  what it costs if wrong) so you can audit its judgment later.
+- **A pre-flight checklist before unattended runs** — including the rule that
+  the AI never grades its own homework: something external (a test, a probe,
+  an exit code) decides whether it succeeded.
 
-| Hook | Event | Behavior |
-|---|---|---|
-| `block-destructive-git` | PreToolUse | Blocks `push --force`, `reset --hard`, `branch -D`, `clean -f`, `stash pop/drop/clear`, `checkout .` — catches `-C`, `git.exe`, long flags. Fail-closed. Denials condense after 3/session. |
-| `block-protected-dirs` | PreToolUse | Refuses writes into configured directories (acceptance targets, ground truth). Fail-closed. |
-| `fact-force` | PreToolUse | First edit to a critical-surface file each session is DENIED with a fact checklist (callers, red test, reproduced number, units); the retry passes. Investigation beats self-evaluation. |
-| `session-hygiene` | Stop | A heavy edit session cannot end while every configured trail file is untouched today. Blocks once. |
-| `context-monitor` | PostToolUse | Two-stage context alarm: pre-alarm ("finish this iteration") at 40% remaining, trip ("checkpoint now") at 25%. Each fires once. Alarm-rationalized: every message names an action. |
-| `run-on-commit` | PostToolUse | Runs a configured command detached after commits (keep a knowledge graph / codemap fresh automatically). |
+**Six hooks** — the rules that are *enforced*, not remembered:
+
+| Hook | Plain meaning |
+|---|---|
+| `block-destructive-git` | The AI can't run git commands that destroy work (`push --force`, `reset --hard`, deleting branches, discarding files). If you truly want one, you run it yourself. |
+| `block-protected-dirs` | Folders you declare untouchable stay untouchable — answer keys, ground-truth data, targets the AI is graded against. |
+| `fact-force` | "Look before you touch": the first edit to a file you marked critical is refused until the AI states who calls that code, what test would catch a mistake, and what measurement justifies the change. Then the edit goes through. |
+| `session-hygiene` | The AI can't clock out of a heavy work session without writing down what happened somewhere durable. |
+| `context-monitor` | A low-fuel gauge for the AI's memory: one early "finish what you're doing" warning, one later "save your state NOW" warning. Each fires once — nagging trains itself ignored. |
+| `run-on-commit` | After each commit, quietly re-runs a command you choose (like rebuilding a code map) so derived stuff never goes stale. |
 
 ## Configure
 
@@ -67,19 +80,42 @@ are on by default.
 
 ## Design choices
 
-- **Blocking hooks fail CLOSED** on oversized/unparseable input; advisory
-  hooks fail open. An abnormal payload must not waive a guard.
-- **Fresh-context dual review, both-must-PASS.** Same-thread re-review only
-  confirms old findings are fixed — it never finds new ones. Two model
-  families catch what one family's blind spot misses.
-- **Identity-based stall detection.** Finding *counts* aren't comparable
-  across fresh reviewers; a surviving finding is.
-- **Noise clause on merges.** On a noisy metric, a single before/after number
-  inside the noise band is INCONCLUSIVE, not an improvement.
-- **Judge independence for loops.** A loop that writes its own verdict always
-  converges to "done."
-- **Alarm rationalization.** Every alert names the action available at that
-  moment and fires once; a standing alarm trains itself ignored.
+- **When a safety rule can't verify its input, it refuses** (the blocking
+  hooks); helper alerts do the opposite and stay quiet. A weird payload must
+  never accidentally switch a guard off.
+- **Fresh eyes find new problems.** An AI re-reviewing inside the same
+  conversation only checks its old findings; a fresh conversation — ideally a
+  different model family — finds what the first one is blind to. Both must
+  say PASS.
+- **"Still broken" beats "how many findings."** Review rounds are judged by
+  whether a specific problem survived, not by whether the count went down —
+  two reviewers can slice the same problems into different counts.
+- **Jitter is not improvement.** If a result moved less than that
+  measurement normally wobbles on its own, the honest verdict is
+  "inconclusive", and inconclusive never merges.
+- **The worker never grades its own homework.** Unattended runs succeed only
+  when an external check (a test, a probe, an exit code) says so — a loop
+  allowed to declare its own victory always declares it.
+- **Alarms that always ring get ignored.** (Borrowed from control-room alarm
+  management, where this is a life-safety discipline.) Every alert here names
+  the action available at that moment, and fires once.
+
+## Glossary — our word → plain meaning → (industry term, if you want it)
+
+| Our word | Plain meaning | Industry term |
+|---|---|---|
+| front | one ongoing piece of work | workstream / epic |
+| board | the status table, one row per front | kanban board |
+| dossier | the running notebook for one front | experiment log |
+| ledger line | one-line summary of one work round | structured log entry |
+| hand-back | work an AI returns claiming it's done | deliverable / PR |
+| review ladder | staged checking, cheap → expensive | quality gates |
+| merge gate | the three questions before keeping a change | definition of done |
+| noise clause | "moved less than the usual wobble = not an improvement" | statistical significance |
+| judge independence | the worker doesn't grade its own homework | the test-oracle problem |
+| hook wall | rules enforced by programs, not by asking nicely | guardrails / policy-as-code |
+| fact-force | look before you touch | (no standard term) |
+| board theater | a status board that lies | cf. "security theater" |
 
 ## Lineage
 
