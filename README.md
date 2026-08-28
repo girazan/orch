@@ -83,10 +83,12 @@ Records, below) and you ratify them, but it never edits its own contract.
 as the strictest case and parks for you.
 
 One honest sentence on scope: the ship-gate hook gates the git *commands the
-AI types* — deny-by-default outside a read allowlist, matched on the
-command's shape so argument tricks (quoting, aliases, `cd` mid-command)
-don't help. It is not a sandbox: a script that runs `git` from inside is out
-of its sight. The lock file and you are the lines behind it.
+AI types* — deny-by-default outside a short read/local allowlist, and it
+judges a commit or push by what's actually sitting in your repo — staged,
+dirty, unpushed — never by the command's arguments, so argument tricks
+(quoting, aliases, a `cd` mid-command) have nothing to fool. It is not a
+sandbox: a script that runs `git` from inside is out of its sight. The lock
+file and you are the lines behind it.
 
 **What deny-by-default costs you, day to day:** the AI can't `pull`,
 `merge` (including `--continue`), `rebase`, `cherry-pick`, `revert`, `am`,
@@ -136,7 +138,7 @@ The rules that are *enforced*, not remembered:
 | Hook | Plain meaning |
 |---|---|
 | `block-destructive-git` | The AI can't run git commands that destroy work (`push --force`, `reset --hard`, deleting branches, discarding files) — and, as of this release, can't remote-merge a PR (`gh pr merge`) or make a mutating GitHub API call either. If you truly want one, you run it yourself. |
-| `contract-ship-gate` | The AI can't ship outside the grant your contract gives it: every git command is denied unless it's on a short read-only allowlist or is a `commit`/`push` your contract's `ship` value actually covers. If you truly want it shipped, you run the command yourself. |
+| `contract-ship-gate` | The AI can't ship outside the grant your contract gives it: every git command is denied unless it's on a short read/local allowlist (everyday local file ops like `add`, `restore`, `switch`, `stash` — nothing that ships) or is a `commit`/`push` your contract's `ship` value actually covers. If you truly want it shipped, you run the command yourself. |
 | `block-protected-dirs` | Folders you declare untouchable stay untouchable — answer keys, ground-truth data, targets the AI is graded against. |
 | `fact-force` | "Look before you touch": the first edit to a file you marked critical is refused until the AI states who calls that code, what test would catch a mistake, and what measurement justifies the change. Then the edit goes through. |
 | `session-hygiene` | The AI can't clock out of a heavy work session without writing down what happened somewhere durable. |
