@@ -10,7 +10,7 @@ description: >
 
 The BRIEF is the interface: whatever tool shapes the idea, the output
 lands in this exact format at the top of the campaign's worklog
-(`tmp/worklogs/<campaign>.md`):
+(`tmp/worklogs/C<n>-<name>.md` — see Register for the number):
 
     BRIEF
     goal:    <one sentence>
@@ -45,7 +45,17 @@ Native fallback — exactly three questions, one at a time:
 
 ## Register
 
-Add the campaign's row to `docs/BOARD.md` (status: ready) and commit the board
-edit. Classify the `domains:` line against the contract now — if any part
-is `decide: human`, tell the operator where they will be needed. Then
-hand to `/orch:go` (phase: route).
+1. Assign the lane number: max `C<n>` on `docs/BOARD.md` + 1 (numbers are
+   never reused and survive archival). The campaign is `C<n> · <name>`
+   everywhere from here on; its worklog is `tmp/worklogs/C<n>-<name>.md`.
+2. Add the row to `docs/BOARD.md` (status: ready) and commit the edit.
+3. Seed the route: if the board has no `## ROUTE` section, ask the
+   operator for bucket labels once (e.g. `NOW · SEP W1 · SEP W2-3`), then
+   add one item line per known step from the BRIEF:
+   `C<n> | <bucket> | <item> |` — with `-> <outcome>` where a step feeds
+   the next, and `milestone: <label>` on the done-condition item. Owner
+   actions the BRIEF implies (merge clicks, sign-offs) go to the YOU lane:
+   `YOU | <bucket> | <item> |`.
+4. Classify the `domains:` line against the contract now — if any part is
+   `decide: human`, tell the operator where they will be needed. Then hand
+   to `/orch:go` (phase: route).

@@ -17,8 +17,12 @@ judgment, verdict-only; suited cheap models execute.
 ## On every invocation
 
 1. Read: `docs/BOARD.md` · the active campaign's worklog · `docs/adr/` for
-   `Status: proposed` · the contract.
-2. Report ≤5 lines: campaign, phase, blockers, unratified ADRs, parked items.
+   `Status: proposed` · the contract. Legacy boards: if rows lack `C<n>`
+   numbers, assign them now (max + 1, row order) and say so — the one
+   write `/orch:board` also shares.
+2. Report ≤5 lines: lane (`C<n>`), phase, blockers (⚠ + age if a lane sat
+   in one status past `board.staleDays`, default 3), unratified ADRs with
+   ages, parked items.
 3. Decide the phase — ORDERED, first match wins:
 
 | # | Condition | Phase |
@@ -58,8 +62,10 @@ Detail lives in worklogs, never the board.
   EVERY consequential autonomous decision writes a `Ruling:` line.
 - Multi-match → strictest wins (human beats ai; lower ship rank beats
   higher). No match, a conflict, or a ship-gate BLOCK naming `unmatched` →
-  park + write a proposed ADR with a ready-to-paste amendment. You NEVER
-  edit the contract yourself.
+  park + write a proposed ADR with a ready-to-paste amendment, and append
+  the parked action to the board's YOU lane
+  (`YOU | NOW | <item> |`) so owner work is visible as a track, not
+  scattered in prose. You NEVER edit the contract yourself.
 - INCONCLUSIVE verdicts always go to the operator.
 - The ship-gate hook enforces the ship side deny-by-default: git
   subcommands outside its read/local allowlist are refused entirely, and
@@ -85,7 +91,7 @@ Detail lives in worklogs, never the board.
    only on approval, with `approved:operator`. `decide: ai` → write it
    with `approved:auto`.
 5. Append to the worklog, exactly:
-   `ROUTE: <domain> · decide:<ai|human> · ship:<none|commit|push> · tier:<model-tier> · approved:<operator|auto> · <date>`
+   `ROUTE: lane:C<n> · <domain> · decide:<ai|human> · ship:<none|commit|push> · tier:<model-tier> · approved:<operator|auto> · <date>`
    Then enter phase work.
 
 ## Phase: ship
@@ -105,6 +111,9 @@ Detail lives in worklogs, never the board.
 3. Board: evidence-before-done — the row flips to `merged` ONLY with a
    ledger line or artifact path behind it (else `needs_attention`); commit
    the board edit with the work. Evidence + baseline SHA in the commit/PR.
+   Mark the lane's completed ROUTE items `✓` and update the `TODAY'S
+   QUEUE` expectations in the same board commit; a `milestone:` item
+   flipping ✓ is what closes the lane.
 
 ## Records & session end
 
