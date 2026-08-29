@@ -51,7 +51,7 @@ orchestrator after the hand-back, or it double-pays every seat.
 3. **Resume vs fresh — is its context an ASSET or a LIABILITY?** It wrote
    the code and knows its own choices → resume. It cannot see its own
    error, or the thread is long and full of dead ends → fresh, one tier up.
-4. **Lifetime = the campaign.** A resident worker exists for one lane
+4. **Lifetime = the lane.** A resident worker exists for one lane
    (`C<n>`). Campaign hits `merged` or killed → tear the worker down that same turn.
    An idle resident is cost without benefit; a stale one is worse — it
    answers from a world that moved.
