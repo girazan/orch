@@ -45,15 +45,16 @@ One file, `.claude/orch.json`, at your repo root:
 - Mirror it into `~/.claude/orch-lock.json` and the locked copy *replaces*
   any project copy — the project file is agent-writable, the lock file isn't.
 
-## ⌨️ Three commands
+## ⌨️ Four commands — three act, one looks
 
 | Command | When | What |
 |---|---|---|
 | 🔐 `/orch:setup` | once per repo | interviews you into a contract, offers lock mirroring, ratifies ADRs |
 | 🎯 `/orch:goal` | per piece of work | shapes a one-page brief: goal, metric, done-condition, kill criteria |
 | 🚦 `/orch:go` | every session after | reads the board and contract, picks its own phase (route → work → ship, or a whole unattended loop), stops only where your contract says |
+| 📊 `/orch:board` | whenever you want to look | read-only route map: buckets × lanes, the YOU owner lane, stale flags, metric positions, ADR ages, today's queue — plus `html` for a shareable page |
 
-There is no bare `/orch`. [Architecture diagram →](docs/orch-architecture.html)
+There is no bare `/orch` — always one of these four. [Architecture diagram →](docs/orch-architecture.html)
 
 ## 🧱 Eight hooks — enforced, not remembered
 
@@ -97,6 +98,7 @@ never silently disable a guard.
   "workflow": { "tools": { "research": "your-deep-research-tool" } },
   "models": { "frontier": "opus", "high": "opus", "mid": "sonnet", "low": "haiku" },
   "protectedDirs": ["acceptance"],
+  "board": { "staleDays": 3 },
   "readBeforeWrite": { "pathRegex": "(Solver|Kernel)", "facts": ["Every caller (grep, not memory).", "The red test.", "The reproduced number.", "Units."] },
   "sessionHygiene": { "trailPaths": ["tmp/worklogs", "docs/BOARD.md"], "minEdits": 8 },
   "contextMonitor": { "window": 200000, "preAlarm": 0.40, "trip": 0.25 },
