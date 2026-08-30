@@ -16,10 +16,8 @@
 // persist or input is abnormal, allow (a permanent deny loop is worse).
 'use strict';
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
-const crypto = require('crypto');
-const { readStdin, loadConfig } = require('./lib/config');
+const { readStdin, loadConfig, tmpMark } = require('./lib/config');
 
 const { j } = readStdin();
 if (!j) process.exit(0);
@@ -40,8 +38,7 @@ try {
 if (!hot.test(f) || (scope && !scope.test(f))) process.exit(0);
 
 const session = j.session_id || 'nosession';
-const key = crypto.createHash('md5').update(session + '|' + f.toLowerCase()).digest('hex');
-const marker = path.join(os.tmpdir(), 'orch-rbw-' + key);
+const marker = tmpMark('orch-rbw', session, f.toLowerCase());
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 if (fs.existsSync(marker)) {

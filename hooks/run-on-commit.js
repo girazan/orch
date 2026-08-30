@@ -9,10 +9,9 @@
 //   { "runOnCommit": { "command": "graphify", "args": ["update", "."] } }
 'use strict';
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
-const { readStdin, loadConfig } = require('./lib/config');
+const { readStdin, loadConfig, tmpMark } = require('./lib/config');
 
 try {
   const { j } = readStdin();
@@ -29,7 +28,9 @@ try {
     .test(cmd) || new RegExp(G + '\\brebase\\b' + SEG + '--continue').test(cmd);
   if (!shaped) process.exit(0);
 
-  const lock = path.join(os.tmpdir(), 'orch-runoncommit.lock');
+  // Per-repo lock — two repos committing in parallel must not debounce
+  // each other.
+  const lock = tmpMark('orch-runoncommit', path.resolve(j.cwd || process.cwd()).toLowerCase());
   try {
     if (fs.existsSync(lock) && Date.now() - fs.statSync(lock).mtimeMs < 10 * 60 * 1000) process.exit(0);
   } catch {}

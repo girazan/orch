@@ -10,10 +10,7 @@
 // condense to one line so repeated blocks can't flood the context window.
 'use strict';
 const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const crypto = require('crypto');
-const { readStdin, loadConfig } = require('./lib/config');
+const { readStdin, loadConfig, tmpMark } = require('./lib/config');
 
 const { j, oversized } = readStdin();
 if (oversized) {
@@ -46,8 +43,7 @@ for (const extra of cfg.extraPatterns || []) {
 
 for (const [re, name] of rules) {
   if (re.test(cmd)) {
-    const key = crypto.createHash('md5').update(j.session_id || 'nosession').digest('hex');
-    const counterFile = path.join(os.tmpdir(), 'orch-destrgit-' + key);
+    const counterFile = tmpMark('orch-destrgit', j.session_id || 'nosession');
     let n = 1;
     try { n = parseInt(fs.readFileSync(counterFile, 'utf8'), 10) + 1 || 1; } catch { n = 1; }
     try { fs.writeFileSync(counterFile, String(n)); } catch {}

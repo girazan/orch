@@ -14,10 +14,7 @@
 // Env override: ORCH_CTX_WINDOW.
 'use strict';
 const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const crypto = require('crypto');
-const { readStdin, loadConfig } = require('./lib/config');
+const { readStdin, loadConfig, tmpMark } = require('./lib/config');
 
 const { j } = readStdin();
 if (!j || !j.transcript_path) process.exit(0);
@@ -49,8 +46,7 @@ if (!ctx) process.exit(0);
 
 const remaining = 1 - ctx / WINDOW;
 const session = j.session_id || 'nosession';
-const mark = stage => path.join(os.tmpdir(),
-  'orch-ctxmon-' + stage + '-' + crypto.createHash('md5').update(session).digest('hex'));
+const mark = stage => tmpMark('orch-ctxmon-' + stage, session);
 const fired = s => fs.existsSync(mark(s));
 const fire = s => { try { fs.writeFileSync(mark(s), '1'); } catch {} };
 

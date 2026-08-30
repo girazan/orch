@@ -4,9 +4,17 @@
 // A user-level lock file (~/.claude/orch-lock.json) deep-overrides project
 // config: a per-repo orch.json can never switch off a guard the user locked.
 'use strict';
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+
+function tmpMark(prefix, ...parts) {
+  // Stable per-session/per-key marker path in the OS tmpdir. Parts are
+  // hashed so paths and session ids never leak into filenames.
+  const key = crypto.createHash('md5').update(parts.join('|')).digest('hex');
+  return path.join(os.tmpdir(), prefix + '-' + key);
+}
 
 function deepMerge(base, win) {
   // win overrides base; plain objects merge, everything else replaces.
@@ -79,4 +87,4 @@ function appendAudit(root, entry) {
   }
 }
 
-module.exports = { readStdin, loadConfig, appendAudit, AUDIT_REL };
+module.exports = { readStdin, loadConfig, appendAudit, tmpMark, AUDIT_REL };

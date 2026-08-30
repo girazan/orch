@@ -58,7 +58,7 @@ function check(name, cond) {
 const r = run(['--stale', 'C2:5d', '--digest', 'C1:4 ships · 1 block', '--queue', 'suite -> PR -> click']);
 check('exit 0', r.status === 0);
 const html = fs.readFileSync(OUT, 'utf8');
-check('self-contained (no external refs)', !/src=|href=|@import|url\(/i.test(html) || !/https?:\/\//.test(html));
+check('self-contained (no external URLs)', !/(?:src|href)\s*=\s*["']?https?:|@import|url\(\s*["']?https?:/i.test(html));
 check('bucket headers rendered', html.includes('SEP W2-3'));
 check('lane track rendered', /C1[^<]*hds/.test(html));
 check('item rendered', html.includes('PT0053 two-cycle fix'));

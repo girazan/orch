@@ -23,11 +23,8 @@
 // misses a reading.
 'use strict';
 const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const crypto = require('crypto');
 const { execSync } = require('child_process');
-const { readStdin, loadConfig } = require('./lib/config');
+const { readStdin, loadConfig, tmpMark } = require('./lib/config');
 
 const { j } = readStdin();
 if (!j) process.exit(0);
@@ -45,9 +42,8 @@ const MAX_AGENTS = Math.max(1, num(cfg.maxAgents, 12));
 const PATTERN = cfg.pattern || 'ctx:([0-9]+)%';
 
 const session = j.session_id || 'nosession';
-const key = crypto.createHash('md5').update(session).digest('hex');
-const pollMark = path.join(os.tmpdir(), 'orch-fleet-poll-' + key);
-const stateFile = path.join(os.tmpdir(), 'orch-fleet-state-' + key);
+const pollMark = tmpMark('orch-fleet-poll', session);
+const stateFile = tmpMark('orch-fleet-state', session);
 
 // Debounce: Stop fires every turn; polling a fleet every turn would tax
 // every reply for a number that moves on the scale of minutes.
