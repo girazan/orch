@@ -4,6 +4,8 @@ description: >
   Onboard a repo onto the orch contract, edit contract domains, mirror the
   contract into the lock file, configure workflow tools, and ratify or
   reject proposed ADRs. The only place the contract changes.
+  Do NOT use for day-to-day work (/orch:go), creating campaigns
+  (/orch:goal), or viewing the board (/orch:board).
 ---
 
 # /orch:setup — contract governance
@@ -22,7 +24,8 @@ without them.
    Record the WHY as `expertise` — future classification reads it to
    break ties.
 3. Remind: omission never grants — unmatched work parks and proposes an
-   amendment. Don't aim for total coverage on day one.
+   amendment. Don't aim for total coverage on day one. (Classification
+   semantics are canonical in /orch:go § The contract.)
 4. Write `.claude/orch.json` → `contract` with `"version": 1`.
 5. OFFER LOCK MIRRORING: the project file is agent-writable; mirroring
    `contract` into `~/.claude/orch-lock.json` makes the lock's contract

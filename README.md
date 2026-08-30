@@ -126,6 +126,12 @@ dossier → worklog · hook wall → guardrails · judge independence → indepe
 reviewer · fact-force → read-before-write (config key `factForce` still
 works, with a notice).
 
+## 🧪 Development
+
+`npm test` runs every suite in `tests/` (plain Node, no dependencies);
+`node tests/test-<name>.js` runs one. See `CHANGELOG.md` for release
+history.
+
 ## 🙏 Lineage
 
 Ideas adapted, with thanks: fresh-context re-review loops (Kenton Varda) ·

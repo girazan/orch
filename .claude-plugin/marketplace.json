@@ -5,7 +5,7 @@
     {
       "name": "orch",
       "source": "./",
-      "description": "The decision contract for AI-driven work: you decide once which domains are yours; frontier AI plans, reviews, and gates; cheap AI executes; deterministic hooks enforce who may ship what; every decision leaves a record."
+      "description": "The decision contract for AI-driven work: the human decides once which domains are theirs; frontier AI orchestrates, plans, reviews, and gates; cheap AI executes; shipping is enforced per contract by deterministic hooks; every decision leaves a record (audit trail, Rulings, ADRs)."
     }
   ]
 }

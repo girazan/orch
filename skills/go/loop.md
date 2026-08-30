@@ -24,3 +24,6 @@ ship-gate caps what the loop lands regardless of what it believes.
 
 Launch journal, in the worklog:
 `LAUNCH <date> · <prompt file> · max-iter <n> · budget <tokens> · promise <string>`
+
+Complete when: the completion promise passes, or the cap/budget trips —
+either way the outcome line lands in the worklog before anything else.

@@ -42,4 +42,5 @@ number, verdict. Consequential autonomous calls:
 Simplicity criterion: improvement bought with disproportionate complexity
 → flag `⚠complexity`; a flat result that DELETED code is a win — keep it.
 
-Ledger satisfies the BRIEF's `done:` → return to the driver, phase ship.
+Complete when: the ledger satisfies the BRIEF's `done:` → return to the
+driver, phase ship.

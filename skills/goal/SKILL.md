@@ -4,6 +4,9 @@ description: >
   Create or edit a campaign: shape the goal into a one-page BRIEF (goal,
   metric, done-condition, contract domains touched, kill criteria) using
   the routed shaping tool, and register the campaign on the board.
+  Do NOT use for running work on an existing campaign (/orch:go), for
+  contract or domain edits (/orch:setup), or for viewing progress
+  (/orch:board).
 ---
 
 # /orch:goal — define a campaign
@@ -48,6 +51,8 @@ Native fallback — exactly three questions, one at a time:
 1. Assign the lane number: max `C<n>` on `docs/BOARD.md` + 1 (numbers are
    never reused and survive archival). The campaign is `C<n> · <name>`
    everywhere from here on; its worklog is `tmp/worklogs/C<n>-<name>.md`.
+   Create `tmp/worklogs/` and `docs/adr/` now if missing — nothing else
+   scaffolds them.
 2. Add the row to `docs/BOARD.md` (status: ready) and commit the edit.
 3. Seed the route: if the board has no `## ROUTE` section, ask the
    operator for bucket labels once (e.g. `NOW · SEP W1 · SEP W2-3`), then
@@ -59,3 +64,7 @@ Native fallback — exactly three questions, one at a time:
 4. Classify the `domains:` line against the contract now — if any part is
    `decide: human`, tell the operator where they will be needed. Then hand
    to `/orch:go` (phase: route).
+
+Complete when: the BRIEF sits at the top of the worklog, the board row
+exists (status: ready) and is committed, and the ROUTE section has the
+lane's items.

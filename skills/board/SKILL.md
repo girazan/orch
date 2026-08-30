@@ -4,7 +4,8 @@ description: >
   Render the orch route board: a read-only, forward-looking map of every
   campaign lane (buckets × tracks, the YOU owner lane, gates, today's
   queue). Use when the operator wants to see progress, the path to done,
-  stale lanes, or pending ADRs — without starting any work.
+  stale lanes, or pending ADRs — without starting any work. Do NOT use
+  to start, route, or ship anything — /orch:go acts; this only looks.
 ---
 
 # /orch:board — three commands act, this one looks

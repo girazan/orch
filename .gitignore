@@ -1,3 +1,7 @@
 tests/scratch-*/
 .claude/
 docs/*.visual-check.*
+.remember/
+.superpowers/
+docs/serve-tailnet.js
+docs/superpowers/

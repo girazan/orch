@@ -1,5 +1,4 @@
-// contract-ship-gate.js acceptance matrix — REV-4 delta (see task-3-brief.md
-// + the delta overrides in the dispatch prompt). Fake HOME throughout; a
+// contract-ship-gate.js acceptance matrix. Fake HOME throughout; a
 // real git repo + bare remote so push/base-resolution logic runs for real.
 'use strict';
 const { execFileSync } = require('child_process');

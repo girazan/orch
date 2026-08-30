@@ -5,6 +5,8 @@ description: >
   reads the board, worklogs, contract, and unratified ADRs, decides the
   current phase (route/work/ship/loop) by ordered precedence, acts, and
   reports. The human decides only what the contract reserves for them.
+  Do NOT use to shape a new campaign (/orch:goal), edit the contract or
+  ratify ADRs (/orch:setup), or just view progress (/orch:board).
 ---
 
 # /orch:go — the session driver
@@ -55,6 +57,9 @@ Detail lives in worklogs, never the board.
 
 ## The contract
 
+Canonical statement of classification semantics — setup and README point
+here; if wording ever differs, this section wins.
+
 - Classify by `paths`; the `expertise` text breaks ties — semantics over
   globs ("web-ui path but a setpoint calculation → numerics"). This
   judgment is yours; the hook enforces only the path axis.
@@ -94,6 +99,9 @@ Detail lives in worklogs, never the board.
    `ROUTE: lane:C<n> · <domain> · decide:<ai|human> · ship:<none|commit|push> · tier:<model-tier> · approved:<operator|auto> · <date>`
    Then enter phase work.
 
+Complete when: the ROUTE line is in the worklog with its approval
+recorded.
+
 ## Phase: ship
 
 1. Merge gate — all three legs, or park for the operator:
@@ -114,6 +122,9 @@ Detail lives in worklogs, never the board.
    Mark the lane's completed ROUTE items `✓` and update the `TODAY'S
    QUEUE` expectations in the same board commit; a `milestone:` item
    flipping ✓ is what closes the lane.
+
+Complete when: the board row is `merged` (or parked with a named reason)
+and the board commit carries the evidence.
 
 ## Records & session end
 
