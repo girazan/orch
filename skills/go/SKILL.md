@@ -137,6 +137,6 @@ Audit mirror: consequential Rulings also append
 `{ts, decision, scope, domain, verdict, by:"ruling"}` to
 `.claude/orch-audit.jsonl`. ADRs (`docs/adr/NNNN-<slug>.md`,
 `Status: proposed|accepted|rejected|superseded`): pair mode → accepted on
-write; autopilot → ALWAYS proposed, surfaced in step 2 until resolved via
+write; autopilot → ALWAYS proposed, surfaced in the report (step 3) until resolved via
 `/orch:setup`. Before compaction/clock-out: refresh the handoff — ① done
 ② next action ③ entry phase for the next session ④ blockers + owners.
