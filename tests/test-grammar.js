@@ -40,6 +40,9 @@ for (const marker of ['->', 'milestone:', '✓']) {
   check(`renderer handles "${marker}"`, renderer.includes(marker));
 }
 
+// 2b. Focus line — go opens every report with it when lanes are open.
+check('go states the focus line grammar', go.includes('focus: C<n> · <name> (+<k> open)'));
+
 // 3. Ledger iter line — canonical in work.md; board reads before → after.
 check('work states the iter ledger grammar',
   work.includes('iter <n> · <short-sha> · <before> → <after> · keep|revert|flat|refuted · <what>'));

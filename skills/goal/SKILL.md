@@ -51,6 +51,9 @@ Native fallback — exactly three questions, one at a time:
 1. Assign the lane number: max `C<n>` on `docs/BOARD.md` + 1 (numbers are
    never reused and survive archival). The campaign is `C<n> · <name>`
    everywhere from here on; its worklog is `tmp/worklogs/C<n>-<name>.md`.
+   Prefer a short code-like name (2-6 chars, e.g. `HDS`, `RTF`) — the
+   name is the display handle beside the number; `C<n>` stays the only
+   identity.
    Create `tmp/worklogs/` and `docs/adr/` now if missing — nothing else
    scaffolds them.
 2. Add the row to `docs/BOARD.md` (status: ready) and commit the edit.

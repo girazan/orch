@@ -22,10 +22,15 @@ judgment, verdict-only; suited cheap models execute.
    `Status: proposed` · the contract. Legacy boards: if rows lack `C<n>`
    numbers, assign them now (max + 1, row order) and say so — the one
    write `/orch:board` also shares.
-2. Report ≤5 lines: lane (`C<n>`), phase, blockers (⚠ + age if a lane sat
-   in one status past `board.staleDays`, default 3), unratified ADRs with
-   ages, parked items.
-3. Decide the phase — ORDERED, first match wins:
+2. Focus — exactly one lane per session when several are open: the
+   operator's named lane (`/orch:go C2`) wins; else the lane whose
+   worklog was most recently touched; else the first non-blocked lane in
+   board order. Never silently switch focus mid-session.
+3. Report ≤5 lines, opening with
+   `focus: C<n> · <name> (+<k> open)` — then phase, blockers (⚠ + age if
+   a lane sat in one status past `board.staleDays`, default 3),
+   unratified ADRs with ages, parked items.
+4. Decide the phase — ORDERED, first match wins:
 
 | # | Condition | Phase |
 |---|---|---|
