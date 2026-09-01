@@ -1,5 +1,6 @@
 // appendAudit + AUDIT_REL + __corrupt + atomic locked contract.
 'use strict';
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,8 +10,13 @@ fs.rmSync(dir, { recursive: true, force: true });
 fs.mkdirSync(path.join(FAKEHOME, '.claude'), { recursive: true });
 fs.mkdirSync(path.join(dir, 'proj', '.claude'), { recursive: true });
 process.env.USERPROFILE = FAKEHOME; process.env.HOME = FAKEHOME;
-const { appendAudit, AUDIT_REL, loadConfig } = require('../hooks/lib/config');
+const { appendAudit, AUDIT_REL, loadConfig, resolveRepoKey } = require('../hooks/lib/config');
 const PROJ = path.join(dir, 'proj');
+// Initialize git repo so resolveRepoKey works
+execFileSync('git', ['init', '-q'], { cwd: PROJ });
+execFileSync('git', ['-C', PROJ, 'config', 'user.email', 't@t.com']);
+execFileSync('git', ['-C', PROJ, 'config', 'user.name', 't']);
+const repoKey = resolveRepoKey(PROJ);
 
 let pass = 0, fail = 0, n = 0;
 function check(name, cond) {
@@ -38,7 +44,7 @@ fs.writeFileSync(path.join(PROJ, '.claude', 'orch.json'),
 check('no __corrupt on good json', loadConfig({ cwd: PROJ }).__corrupt !== true);
 
 fs.writeFileSync(path.join(FAKEHOME, '.claude', 'orch-lock.json'),
-  JSON.stringify({ contract: { version: 1, domains: { core: { paths: ['src/**'], decide: 'human', ship: 'none' } } } }));
+  JSON.stringify({ repos: { [repoKey]: { contract: { version: 1, domains: { core: { paths: ['src/**'], decide: 'human', ship: 'none' } } } } } }));
 const merged = loadConfig({ cwd: PROJ });
 check('locked contract replaces project contract', merged.contract.version === 1);
 check('project-added domain does NOT survive lock', merged.contract.domains.evil === undefined);

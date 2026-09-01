@@ -4,6 +4,7 @@
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { resolveRepoKey } = require('../hooks/lib/config');
 
 const HOOK = path.join(__dirname, '..', 'hooks', 'contract-ship-gate.js');
 const SCRATCH = path.join(__dirname, 'scratch-ship');
@@ -96,6 +97,8 @@ g('push', '-u', 'origin', 'main');
 // Deliberately no `remote set-head` here — refs/remotes/origin/HEAD stays
 // absent locally so the ls-remote fallback test actually exercises that path.
 
+const repoKey = resolveRepoKey(REPO);
+
 const DOMAINS = {
   docs: { paths: ['docs/**', '**/*.md'], decide: 'ai', ship: 'push' },
   tests: { paths: ['tests/**'], decide: 'ai', ship: 'commit' },
@@ -103,6 +106,8 @@ const DOMAINS = {
   claude: { paths: ['.claude/**'], decide: 'ai', ship: 'push' },
 };
 const BASE_CONTRACT = { contract: { domains: DOMAINS } };
+// Wrap BASE_CONTRACT in repo-scoped format for lock writes
+const BASE_CONTRACT_SCOPED = { repos: { [repoKey]: BASE_CONTRACT } };
 
 // ===================================================== INACTIVE / INVALID
 setCfg({});
@@ -297,7 +302,7 @@ g('checkout', 'main');
 
 // ===================================================== LOCK REPLACEMENT
 setCfg({ contract: { domains: { ...DOMAINS, free: { paths: ['free/**'], decide: 'ai', ship: 'push' } } } });
-setLock(BASE_CONTRACT);
+setLock(BASE_CONTRACT_SCOPED);
 writeFile('free/x.txt');
 g('add', 'free/x.txt');
 check('57. project-added domain dead under lock -> 2', run('git commit -m x').code === 2);

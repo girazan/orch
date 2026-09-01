@@ -21,7 +21,14 @@ if (!j) process.exit(0);
 const cmd = (j.tool_input && (j.tool_input.command || '')) || '';
 if (!cmd) process.exit(0);
 
-const cfg = (loadConfig(j).destructiveGit) || {};
+const full = loadConfig(j);
+if (full.__lockCorrupt) {
+  // The operator locked guards and the lock is unreadable: their authority
+  // is unrecoverable, so fail CLOSED rather than run ungated (spec §1).
+  console.error('BLOCKED (orch): ~/.claude/orch-lock.json is corrupt — locked guard authority unrecoverable. Fix the lock file.');
+  process.exit(2);
+}
+const cfg = full.destructiveGit || {};
 if (cfg.enabled === false) process.exit(0);
 
 const SEG = '[^\\n|;&]*';

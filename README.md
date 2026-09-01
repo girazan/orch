@@ -43,7 +43,19 @@ One file, `.claude/orch.json`, at your repo root:
   anything matching no domain parks for you, and the AI drafts an amendment
   (an ADR) that only you can ratify.
 - Mirror it into `~/.claude/orch-lock.json` and the locked copy *replaces*
-  any project copy — the project file is agent-writable, the lock file isn't.
+  any project copy — the project file is agent-writable, the lock file
+  isn't. Since v0.7.0 the mirrored contract lives under
+  `repos[<this repo's git common dir>]` in the lock file, not the lock's
+  top level — so one lock file safely holds different contracts for
+  different repos. `/orch:setup` handles this automatically; existing
+  locks migrate via `node scripts/migrate-lock.js` (safe to re-run).
+- Domains may optionally carry `tiers: { work, review }` floors (schema 2, `schemaVersion` field required).
+  `work` is the minimum tier a delegate may implement at in that domain (advisory only in v0.7.0 —
+  no hook enforces it until the v0.8.0 tier gate); `review` is what the `go`
+  skill applies at verdict time — a hook cannot tell a work brief from a review brief, so it's
+  INSTRUCTED behavior, not a hook. Roles are
+  `low`, `mid`, `high`, and `frontier` (never mixed with other terms). Locking a tiered contract requires locking
+  the models map: a locked `contract` now replaces the bundle `{contract, models}` wholesale.
 
 ## ⌨️ Four commands — three act, one looks
 

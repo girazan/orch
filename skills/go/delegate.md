@@ -25,6 +25,11 @@ Turn count beats token price: a cheap model that takes 3× the turns on
 multi-step work costs more — mid is the floor for prose-brief
 implementers and reviewers.
 
+Contract floors override this table downward-never: a domain's
+`tiers.work` is the minimum for implementation dispatches there,
+`tiers.review` the minimum for review verdicts. "Cheapest that fits"
+operates within the allowed band.
+
 ## Delegation surface (context lifetime → vehicle)
 
 | Work shape | Vehicle |

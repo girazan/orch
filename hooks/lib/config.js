@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 function tmpMark(prefix, ...parts) {
   // Stable per-session/per-key marker path in the OS tmpdir. Parts are
@@ -28,13 +29,29 @@ function deepMerge(base, win) {
 }
 
 function loadLock() {
+  // Provenance matters (spec §1): a present-but-corrupt lock must be
+  // distinguishable from no lock, so guards can fail CLOSED on corruption.
   const p = path.join(os.homedir(), '.claude', 'orch-lock.json');
+  if (!fs.existsSync(p)) return { present: false, corrupt: false, value: null };
   try {
-    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+    return { present: true, corrupt: false, value: JSON.parse(fs.readFileSync(p, 'utf8')) };
   } catch {
-    console.error(`orch: WARNING — ${p} is not valid JSON; locked guard overrides are INACTIVE until fixed.`);
+    console.error(`orch: WARNING — ${p} is not valid JSON; blocking guards FAIL CLOSED until fixed.`);
+    return { present: true, corrupt: true, value: null };
   }
-  return null;
+}
+
+function resolveRepoKey(cwd) {
+  // The repo's git common dir, realpath'd — shared by the main checkout
+  // and every linked worktree, unlike the toplevel working-tree path.
+  try {
+    const raw = execFileSync('git', ['-C', cwd, 'rev-parse', '--git-common-dir'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const abs = path.isAbsolute(raw) ? raw : path.resolve(cwd, raw);
+    return fs.realpathSync.native(abs);
+  } catch {
+    return null;
+  }
 }
 
 function readStdin() {
@@ -66,11 +83,32 @@ function loadConfig(j) {
     }
   }
   const lock = loadLock();
-  let out = lock ? deepMerge(cfg, lock) : cfg;
-  // A locked contract REPLACES the project's — an additive merge would let
-  // the agent-writable project file add permissive domains beside it.
-  if (lock && Object.prototype.hasOwnProperty.call(lock, 'contract')) out.contract = lock.contract;
+  const lockVal = lock.value || {};
+  // Guard toggles (destructiveGit, etc.) merge from the lock's top level,
+  // unscoped. contract/models are repo-specific governance data and are
+  // read ONLY from repos[<repoKey>] below — a legacy top-level contract/
+  // models is inert until /orch:setup migrates it (scripts/migrate-lock.js,
+  // spec §1 "Legacy migration").
+  const lockGuards = {};
+  for (const k of Object.keys(lockVal)) {
+    if (k !== 'repos' && k !== 'contract' && k !== 'models') lockGuards[k] = lockVal[k];
+  }
+  let out = deepMerge(cfg, lockGuards);
+  const cwd = (j && j.cwd) || process.cwd();
+  // Only spawn `git` to resolve the repo key when the lock actually has a
+  // repos scope to look up — the common case (no repos key) skips it.
+  const repoKey = lockVal.repos ? resolveRepoKey(cwd) : null;
+  const repoEntry = (repoKey && lockVal.repos && lockVal.repos[repoKey]) || null;
+  if (repoEntry && Object.prototype.hasOwnProperty.call(repoEntry, 'contract')) {
+    out.contract = repoEntry.contract;
+    out.models = repoEntry.models;
+  }
+  if (lockVal.contract !== undefined || lockVal.models !== undefined) {
+    console.error('orch: WARNING — top-level contract/models in the lock file is inert; run scripts/migrate-lock.js to move it under repos[<key>].');
+  }
   if (corrupt) Object.defineProperty(out, '__corrupt', { value: true });
+  if (lock.corrupt) Object.defineProperty(out, '__lockCorrupt', { value: true });
+  Object.defineProperty(out, '__lock', { value: { present: lock.present, corrupt: lock.corrupt } });
   return out;
 }
 
@@ -87,4 +125,4 @@ function appendAudit(root, entry) {
   }
 }
 
-module.exports = { readStdin, loadConfig, appendAudit, tmpMark, AUDIT_REL };
+module.exports = { readStdin, loadConfig, loadLock, appendAudit, tmpMark, AUDIT_REL, resolveRepoKey };

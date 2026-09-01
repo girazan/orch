@@ -70,6 +70,12 @@ here; if wording ever differs, this section wins.
   judgment is yours; the hook enforces only the path axis.
 - `decide: human` → STOP and ask before acting. `decide: ai` → act, and
   EVERY consequential autonomous decision writes a `Ruling:` line.
+- Domains may carry `tiers: { work, review }` floors (schema 2). `work`
+  is the minimum tier a delegate may implement at in that domain —
+  advisory until the v0.8.0 tier gate. `review` is INSTRUCTED: you apply
+  it yourself when weighing verdicts; no hook can tell a work brief from
+  a review brief. Strictest wins across multi-domain matches: the
+  HIGHEST floor.
 - Multi-match → strictest wins (human beats ai; lower ship rank beats
   higher). No match, a conflict, or a ship-gate BLOCK naming `unmatched` →
   park + write a proposed ADR with a ready-to-paste amendment, and append

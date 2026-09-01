@@ -9,7 +9,7 @@
 // is the only silent pass-through. Every other exit writes an audit line.
 'use strict';
 const { execFileSync } = require('child_process');
-const { readStdin, loadConfig, appendAudit, AUDIT_REL } = require('./lib/config');
+const { readStdin, loadConfig, loadLock, appendAudit, AUDIT_REL } = require('./lib/config');
 
 const RANK = { none: 0, commit: 1, push: 2 };
 // Deny-by-default: only local/read commands escape the gate untouched.
@@ -123,9 +123,6 @@ function classify(command) {
   return res;
 }
 
-const cls = cmd ? classify(cmd) : { action: 0, denied: null, retarget: false };
-if (!oversized && cls.action === 0 && !cls.denied) process.exit(0);
-
 function git(cwdArg, args) {
   // stdio pipes everywhere: a blocked command must print exactly ONE
   // message (ours) — a git subprocess's own stderr is captured, never
@@ -134,6 +131,20 @@ function git(cwdArg, args) {
     { timeout: 5000, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }).toString();
 }
 
+// Cheap corrupt-lock probe: needs no repo root, so this runs on EVERY
+// Bash/PowerShell command without spawning git. The operator locked guards
+// and the lock is unreadable — their authority is unrecoverable, so fail
+// CLOSED rather than run ungated (spec §1).
+if (loadLock().corrupt) {
+  console.error('BLOCKED (orch): ~/.claude/orch-lock.json is corrupt — locked guard authority unrecoverable. Fix the lock file.');
+  process.exit(2);
+}
+
+const cls = cmd ? classify(cmd) : { action: 0, denied: null, retarget: false };
+if (!oversized && cls.action === 0 && !cls.denied) process.exit(0);
+
+// Only a gated action (or a denied one) reaches here — root resolution and
+// the full config load are deferred until they're actually needed.
 const cwd = (j && j.cwd) || process.cwd();
 let root = null;
 try { root = git(cwd, ['rev-parse', '--show-toplevel']).trim(); } catch {}
