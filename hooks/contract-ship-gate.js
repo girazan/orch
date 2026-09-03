@@ -197,7 +197,16 @@ if (!Object.keys(contract.domains).length) process.exit(0); // valid, deliberate
 if (!root) die('not inside a git repository yet a git ship action was issued — refusing to gate blind.', { action: 'invalid' });
 
 if (cls.retarget) die('cd/pushd/-C/--git-dir/GIT_DIR retargeting alongside a gated git action — this gate covers one repo; the operator runs cross-repo commands.', { action: 'retarget' });
-if (cls.denied) die(`${cls.denied} is not on the contract's git surface (read/local commands, commit, push). The operator runs it, or an ADR grants a workflow that needs it.`);
+if (cls.denied) {
+  // merge/pull/rebase only: a literal "# OWNER-APPROVED" marker in the
+  // command lets it through, same escape hatch as the gh-pr-merge evidence
+  // gate. Every other denied verb stays hard-blocked — no marker for those.
+  if (/^git (merge|pull|rebase)$/.test(cls.denied) && /#\s*OWNER-APPROVED\b/i.test(cmd)) {
+    appendAudit(root, { action: cls.denied, verdict: 'ALLOW', by: 'owner-marker' });
+    process.exit(0);
+  }
+  die(`${cls.denied} is not on the contract's git surface (read/local commands, commit, push). The operator runs it, or an ADR grants a workflow that needs it. To approve merge/pull/rebase for this run, append "# OWNER-APPROVED" to the command.`);
+}
 
 function names(out) {
   return [...new Set(out.split(/\r?\n/).map(s => s.replace(/[\r\n]+$/, '')).filter(Boolean))];
