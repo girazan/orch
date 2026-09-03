@@ -200,12 +200,14 @@ if (cls.retarget) die('cd/pushd/-C/--git-dir/GIT_DIR retargeting alongside a gat
 if (cls.denied) {
   // merge/pull/rebase only: a literal "# OWNER-APPROVED" marker in the
   // command lets it through, same escape hatch as the gh-pr-merge evidence
-  // gate. Every other denied verb stays hard-blocked — no marker for those.
+  // gate. The marker is OWNER-TYPED ONLY (`! git merge x # OWNER-APPROVED`
+  // in the prompt) — an agent never appends, quotes, or pastes it (owner
+  // ruling 2026-09-03). Every other denied verb stays hard-blocked.
   if (/^git (merge|pull|rebase)$/.test(cls.denied) && /#\s*OWNER-APPROVED\b/i.test(cmd)) {
     appendAudit(root, { action: cls.denied, verdict: 'ALLOW', by: 'owner-marker' });
     process.exit(0);
   }
-  die(`${cls.denied} is not on the contract's git surface (read/local commands, commit, push). The operator runs it, or an ADR grants a workflow that needs it. To approve merge/pull/rebase for this run, append "# OWNER-APPROVED" to the command.`);
+  die(`${cls.denied} is not on the contract's git surface (read/local commands, commit, push). The operator runs it (for merge/pull/rebase: \`! git ... # OWNER-APPROVED\` typed by the operator — never appended by an agent), or an ADR grants a workflow that needs it.`);
 }
 
 function names(out) {
