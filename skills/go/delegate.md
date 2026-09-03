@@ -44,18 +44,20 @@ orchestrator after the hand-back, or it double-pays every seat.
 Trust matches tier: a low-tier delegate is a transcriber or a grep, not
 a consultant — take its output as material, never as a verdict.
 
-## The brief (every dispatch, six sections)
+## The brief (every dispatch, eight sections)
 
     TASK:      <the one thing, concrete>
+    ASK:       <the operator's words, verbatim — paraphrase inherits your misreadings>
     OUTCOME:   <what done looks like — artifact, diff shape, or number>
     TOOLS:     <what it may use; what it may NOT touch>
     MUST DO:   <ordered steps or constraints that are non-negotiable>
     MUST NOT:  <the boundaries — protected dirs, contract reserves, scope>
+    VETOES:    <every operator correction this session, quoted — context decays; vetoes must not>
     CONTEXT:   <worklog path + everything it needs; it inherits nothing>
 
 An implementation brief thinner than ~15 lines is under-specified —
 fill it out before dispatch; vague briefs buy fix rounds. Recon/scan
-briefs may be shorter, but keep all six headings.
+briefs may be shorter, but keep all eight headings.
 
 ## Killing and restarting a delegate
 

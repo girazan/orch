@@ -18,8 +18,11 @@ operator.
    under test proves nothing) ② assertion-strength ladder (existence →
    type → status → value → behavioral; consequential verdicts need
    value-or-behavioral) ③ disabled-test scan (skips found in review are
-   findings).
-2. JUDGMENT second: diff review, strongest model, verdict-only.
+   findings) ④ green-can-go-red: revert the fix, the new test must FAIL —
+   a test that stays green without the fix proves nothing.
+2. JUDGMENT second: diff review, strongest model, verdict-only, READ-ONLY:
+   the reviewer inspects via `git show <sha>:<path>` / `git diff <base>..<sha>`
+   and never checks out, stashes, or edits — it shares the working tree.
    High-consequence hand-backs get a second reviewer from a DIFFERENT
    model family in a FRESH context, same rubric. Verdicts tri-state:
    PASS / FAIL / INCONCLUSIVE — INCONCLUSIVE holds for the operator, no

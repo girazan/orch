@@ -140,8 +140,9 @@ and the board commit carries the evidence.
 ## Records & session end
 
 Audit mirror: consequential Rulings also append
-`{ts, decision, scope, domain, verdict, by:"ruling"}` to
-`.claude/orch-audit.jsonl`. ADRs (`docs/adr/NNNN-<slug>.md`,
+`{ts, decision, scope, domain, verdict, evidence, by:"ruling"}` to
+`.claude/orch-audit.jsonl` — `evidence` is a pointer (SHA, `file:line`,
+artifact path), never prose. ADRs (`docs/adr/NNNN-<slug>.md`,
 `Status: proposed|accepted|rejected|superseded`): pair mode → accepted on
 write; autopilot → ALWAYS proposed, surfaced in the report (step 3) until resolved via
 `/orch:setup`. Before compaction/clock-out: refresh the handoff — ① done
