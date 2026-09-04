@@ -1,7 +1,7 @@
 # Five-Role Orchestration on Herdr — Brainstorm
 
-Date: 2026-09-04 · Status: **brainstorm** (no review round yet; nothing here
-is committed design) · Baseline: orch v0.7.0 (`6043bb4`) · Companion to
+Date: 2026-09-04 · Status: **brainstorm, operator questions decided**
+(§5; no review round yet) · Baseline: orch v0.7.0 (`6043bb4`) · Companion to
 `2026-08-31-orch-v2-upgrade-design.md` §3 (Coordination) — this note is
 what §3.2's `workflow.coordinator: "herdr"` vehicle could grow into.
 
@@ -18,8 +18,9 @@ orchestrator that never delegates a verdict**. The artifact arranges them
 around **a cheap, stateless Coordinator that never holds a verdict**.
 
 This note maps one onto the other, names where they genuinely disagree,
-proposes what orch should adopt, and lists what only the operator can
-decide. It deliberately does not pick releases or write hook code.
+proposes what orch should adopt, and records the operator's decisions on
+the questions only they could answer (§5). It deliberately does not pick
+releases or write hook code.
 
 ## 1. Crosswalk — same thing, two vocabularies
 
@@ -152,8 +153,8 @@ section (items across buckets, several lanes at once).
 `plan.md`** for its lane — BRIEF on top, then `## Goals` with one section
 per goal carrying `accept:` lines (the missing acceptance criteria), then
 the ledger. The board's ROUTE stays the cross-lane map; goals and ROUTE
-items share a stable id (`C3.g2`) so the board can flip `✓` per goal.
-Dev receives only its `## Goals › g2` section plus named ADRs — the
+items share a stable id (`M3.G2`) so the board can flip `✓` per goal.
+Dev receives only its `## Goals › G2` section plus named ADRs — the
 "never reads the full plan" rule holds by construction.
 
 ## 3. What orch would adopt
@@ -166,14 +167,22 @@ board's `git log` is the campaign journal). Add two directories:
 ```
 docs/BOARD.md                          # = status.md; one screen; per-goal ✓
 docs/adr/NNNN-<slug>.md                # unchanged; Director answers → accepted
-tmp/worklogs/C<n>-<name>.md            # = plan.md: BRIEF · ## Goals (accept: lines) · ledger
-tmp/handoffs/C<n>.g<k>-<role>.md       # ≤40 lines: changed · blocked · decided
-docs/reviews/C<n>.g<k>[-r<round>].md   # pass|fail · blocking reasons (each cites an accept: line) · notes
+tmp/worklogs/M<n>-<name>.md            # = plan.md: BRIEF · ## Goals (accept: lines) · ledger
+tmp/handoffs/M<n>.G<k>-<role>.md       # ≤40 lines: changed · blocked · decided
+docs/reviews/M<n>.G<k>.R<r>.md         # pass|fail · blocking reasons (each cites an accept: line) · notes
 ```
 
 Reviews are git-tracked because they are the evidence the ship gate and
 the v2 GATE block point at; handoffs are scratch (they exist to be read
-once by the next role). Open question 4 asks whether the operator agrees.
+once by the next role). Decided (§5.4).
+
+**Id grammar (decided, §5.5):** `M<n>` milestone · `M<n>.G<k>` goal ·
+`M<n>.G<k>.R<r>` review round — e.g. `M3.G2.R1`. The plan review is
+`M<n>.G0.R<r>`. `M` replaces today's `C<n>` lane prefix because the unit
+of work is the *milestone*, not the campaign; the campaign→milestone
+rename is a vocabulary change across board, goal, go and the grammar
+tests (same shape as the v0.4.0 renames), so it ships as its own step
+with a legacy-`C<n>` read path, not inside this brainstorm.
 
 ### 3.2 Role-scoped guardrails (new; the interesting part)
 
@@ -206,9 +215,9 @@ The artifact names models; orch names roles and pins them once in
 
 | Herdr role | orch tier | effort | Notes |
 |---|---|---|---|
-| Coordinator | `frontier` today; candidate for `mid` once §3.2 hooks exist | medium | cheapness is *earned* by the guardrails, not assumed |
+| Coordinator | `frontier` (decided, §5.1); candidate for `mid` once §3.2 hooks exist and one milestone has run clean | medium | cheapness is *earned* by the guardrails, not assumed |
 | Architect | `frontier` | high | the only role that changes the plan |
-| Reviewer | `tiers.review` floor, never below `high`; second pane from a different family | high | per §2.2 |
+| Reviewer | `tiers.review` floor, never below `high`; second pane pinned by a new `models.review-alt` key (decided, §5.3) | high | per §2.2 |
 | Dev | `tiers.work` floor ∨ Architect's per-goal `tier:` line — **strictest wins** | as needed | this *is* the "Dev model per goal" answer: Architect proposes in the goal section, contract floors it, Coordinator applies |
 
 ### 3.4 Two rubrics, one role (artifact open point 2)
@@ -237,23 +246,23 @@ Same Reviewer pane prompt skeleton, different rubric file.
 
 1. Operator writes the BRIEF via `/orch:goal` (or types the milestone into
    the board header) and starts the Coordinator pane.
-2. Coordinator: `herdr agent start architect-C3 --env ORCH_ROLE=architect`,
+2. Coordinator: `herdr agent start architect-M3 --env ORCH_ROLE=architect`,
    prompt = BRIEF + contract excerpt; `wait --until done|blocked`.
 3. Architect: research route if a knowledge gap exists; interview (≤5
    questions, each blocks the pane; answers → accepted ADRs); writes
    `## Goals` with `accept:` and `tier:` per goal; writes ADRs; writes
-   `tmp/handoffs/C3.plan-architect.md`; done.
+   `tmp/handoffs/M3.G0-architect.md`; done.
 4. Coordinator starts Reviewer pane(s) with `review-plan.md`. fail →
    Architect pane with the review file. pass → continue.
-5. Per goal `g<k>`, in order:
+5. Per goal `G<k>`, in order:
    1. Kill check against `kill:`; capacity check against the fleet roster.
-   2. `herdr agent start impl-C3 --env ORCH_ROLE=dev`, prompt = the
+   2. `herdr agent start impl-M3 --env ORCH_ROLE=dev`, prompt = the
       eight-section brief (`delegate.md`) whose CONTEXT names only
-      `## Goals › g<k>` + listed ADRs.
+      `## Goals › G<k>` + listed ADRs.
    3. Dev implements, tests, commits if the contract grants it, writes
       handoff, done.
    4. Reviewer pane(s) with `review-goal.md`, on a detached worktree of
-      Dev's SHA; writes `docs/reviews/C3.g<k>-r<n>.md`.
+      Dev's SHA; writes `docs/reviews/M3.G<k>.R<n>.md`.
    5. fail → round rule from §2.4 (resume ×2, then fresh one tier up,
       then escalate to Director). pass → Coordinator flips the goal `✓`
       on the board and commits the board; tears down both panes.
@@ -265,29 +274,31 @@ The single-orchestrator mode (today's `/orch:go` in one session) stays
 the default. This flow activates behind `workflow.coordinator: "herdr"`,
 exactly the switch v2 §3.2 already reserved.
 
-## 5. Open questions (operator decides)
+## 5. Operator decisions (2026-09-04)
 
-1. **Coordinator tier.** Start at `frontier` and lower it once §3.2 hooks
-   exist and one milestone has run clean, or start at `mid` and accept
-   sloppier dispatch as the price of learning? Recommendation: start
-   frontier; the guardrails are what make cheap safe.
-2. **One Coordinator per repo or per lane?** Per repo matches "one
-   session, one focus" in go; per lane matches Herdr's "restartable
-   anywhere". Recommendation: one per repo, lane focus rule unchanged.
-3. **Reviewer family.** The artifact says Opus *or* Codex. Dual review
-   requires *different* families, so for `review: dual` one of them is
-   Codex (or another non-Claude), pinned in `models` as a new
-   `review-alt` key? Or keep families out of the contract entirely?
-4. **Git-tracked reviews, scratch handoffs** (§3.1) — agree? The
-   alternative (everything under a gitignored `.orchestration/`) matches
-   the artifact literally but loses the evidence trail the ship gate
-   cites.
-5. **Goal id grammar.** `C3.g2` proposed; ROUTE lines would need to carry
-   it. Cheap now, painful to change after the first board carries them.
-6. **Does this replace the v2 fleet roster (§3.1 there), or feed it?**
-   Recommendation: feed it — each `herdr agent start` also writes a roster
-   entry with `vehicle: "herdr"` and the role, so `/orch:board`'s FLEET
-   footer shows panes and their roles.
+Asked and answered in one round; recorded here so the next revision does
+not reopen them.
+
+1. **Coordinator tier — frontier first.** Lower to `mid` only after the
+   §3.2 role-scoped hooks exist and one milestone has run clean under
+   them.
+2. **One Coordinator per repo.** go's one-session-one-focus rule stays;
+   the existing lane focus rule picks which milestone it drives.
+3. **Second reviewer family — new `models.review-alt` key.** Pinned once
+   in `.claude/orch.json` (e.g. Codex); `review: dual` always uses it.
+   Locking a tiered contract locks this key with the rest of the models
+   map (v2 lock bundle rule).
+4. **Reviews git-tracked, handoffs scratch.** `docs/reviews/` is
+   ship-gate evidence; `tmp/handoffs/` is read once and gitignored.
+5. **Id grammar `M<n>.G<k>.R<r>`.** Milestone, goal, review round —
+   `M3.G2.R1`. `M` replaces `C`; see §3.1 for the rename consequence.
+6. **Feed the v2 fleet roster, do not replace it.** Every
+   `herdr agent start` also writes a roster entry with `vehicle: "herdr"`
+   and the role, so `/orch:board`'s FLEET footer shows panes and roles.
+
+Still open (not asked; surfaced by the decisions): whether the
+campaign→milestone rename lands before or with the first `M`-numbered
+board, and whether `G0` is the right home for the plan review.
 
 ## 6. What would prove this is right
 
