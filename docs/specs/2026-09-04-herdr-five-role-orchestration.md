@@ -5,7 +5,7 @@ r2 re-cuts the unit of work (goal = lane, milestone = board header) and
 splits review into an in-session checker and an independent gate, both
 launched from the working session (§2.8, r2.1); r2.2 adds steps for big
 goals with gate review per step (§2.7); r2.3 closes the open questions
-(§5.11–15) and adds recipes (§7); r2.4 gives milestones a command (§5.16); r2.5 records the project hierarchy (§8). Written against origin/main;
+(§5.11–15) and adds recipes (§7); r2.4 gives milestones a command (§5.16); r2.5 records the project hierarchy (§8); r2.6 the skill routing map (§9). Written against origin/main;
 local main's `board-gh` work (GitHub Issues as the board) is referenced
 where vocabulary overlaps.
 No review round yet · Baseline: orch v0.7.0 (`6043bb4`) · Companion to
@@ -473,6 +473,10 @@ them. 7 and 8 came from the operator's r2 review of r1.
    `accept:` and `recipe:` body lines beside today's `outcome:` and
    `gate:`, so acceptance criterion and workflow type live on GitHub,
    not only in the worklog. See §8 for the full hierarchy.
+17. **Skill routing is one map keyed by stage (r2.6).** `workflow.prefer`
+   + `workflow.tools`; explicit → preferred installed → native; resolved
+   skill recorded in the ROUTE line; gate rubric extended never
+   replaced; Coordinator has no row. Table in §9.
 
 Nothing surfaced by the decisions is still open. What the hand-run in
 §6 should still measure is listed there.
@@ -594,6 +598,53 @@ Commands, five: `/orch:setup` (once per repo, Director) · `/orch:milestone`
 issue + seeded steps, Director; Coordinator proposes) · `/orch:go` (drive
 one lane, Coordinator or today's single session) · `/orch:board` (init
 once, then look).
+
+## 9. Skill routing — one map keyed by stage (r2.6, decided)
+
+Recipes (§7) are sequences of **stages**; roles (§1) are who runs a
+stage; providers are who implements it. The map is keyed by stage, so
+a recipe change never touches config, a provider swap is one line, and
+orch keeps the sequence and the gates while borrowing the craft. It
+extends today's `workflow.tools` (two keys) rather than adding a system.
+
+```json
+"workflow": {
+  "prefer": ["superpowers", "mattpocock", "native"],
+  "tools":  { "debug": "mattpocock:diagnosing-bugs" }
+}
+```
+
+Resolution: explicit `tools[stage]` → first provider in `prefer` that has
+the stage installed → orch's native fallback. A resolver script (`orch
+tools`) prints the resolved table; the route phase writes the resolved
+skill into the ROUTE line, so a session records which skill actually ran.
+
+| stage | role | superpowers | mattpocock | native fallback |
+|---|---|---|---|---|
+| define milestone | Director | brainstorming | grilling | three questions |
+| grill / shape | Architect | brainstorming | grill-with-docs, grilling | three questions |
+| spec | Architect | writing-plans | to-spec | plan section |
+| split to steps | Architect | writing-plans | to-tickets; wayfinder for fog | plan section |
+| domain model | Architect | — | domain-modeling | ADR |
+| tdd | Dev | test-driven-development | tdd | ladder step 1 |
+| debug | Dev | systematic-debugging | diagnosing-bugs | ladder step 1 |
+| research | Architect, Dev | — | research | web search → grade sources |
+| cleanup | Dev | — | — | native (de-sloppify prompt) |
+| merge conflicts | Dev | — | resolving-merge-conflicts | stop, park for owner |
+| gate rubric | Gate | verification-before-completion (checklist) | code-review (second axis) | `review-goal.md`, **always** |
+| handoff | every role | — | handoff | the four-line handoff |
+
+Rules:
+
+- **Providers shape craft, never safety.** Ship gate, role hooks and the
+  review-file rule do not read this map; it needs no lock.
+- **The gate rubric is extended, never replaced** — that rubric is where
+  the independence rule lives.
+- **Verify at resolution time.** Skill names drift across plugin
+  versions; a missing preferred skill falls back and says so in the
+  ROUTE line (the config's existing rename-notice pattern).
+- **The Coordinator has no row.** If it ever wants a skill, judgment has
+  leaked back into it.
 
 ---
 
