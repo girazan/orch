@@ -5,7 +5,7 @@ r2 re-cuts the unit of work (goal = lane, milestone = board header) and
 splits review into an in-session checker and an independent gate, both
 launched from the working session (§2.8, r2.1); r2.2 adds steps for big
 goals with gate review per step (§2.7); r2.3 closes the open questions
-(§5.11–15) and adds recipes (§7); r2.4 gives milestones a command (§5.16). Written against origin/main;
+(§5.11–15) and adds recipes (§7); r2.4 gives milestones a command (§5.16); r2.5 records the project hierarchy (§8). Written against origin/main;
 local main's `board-gh` work (GitHub Issues as the board) is referenced
 where vocabulary overlaps.
 No review round yet · Baseline: orch v0.7.0 (`6043bb4`) · Companion to
@@ -465,6 +465,14 @@ them. 7 and 8 came from the operator's r2 review of r1.
    Milestone on acknowledgement — the flow's step 7 finally has an
    ending). README: "five commands — three act on work, one on scope,
    one looks."
+   r2.5 additions: `split` seeds candidate goals from the Project's
+   **Feature** options (a feature is a noun, a goal is a change with a
+   `done:` line — one feature may need two goals, one goal may cut
+   across features); the BRIEF gains a `feature: <option>` line that
+   step items inherit at `add-item` unless overridden; step items gain
+   `accept:` and `recipe:` body lines beside today's `outcome:` and
+   `gate:`, so acceptance criterion and workflow type live on GitHub,
+   not only in the worklog. See §8 for the full hierarchy.
 
 Nothing surfaced by the decisions is still open. What the hand-run in
 §6 should still measure is listed there.
@@ -554,6 +562,38 @@ any step wanted one that does not exist (r2.3 — tells whether seven is
 too many or too few). Those numbers decide §3.2's priority order,
 §5.1's answer and the last open question in §5. Log them in this lane's
 worklog as the brainstorm's first ledger line.
+
+## 8. Project hierarchy — level · object · id · who creates it · command (r2.5)
+
+| level | GitHub object | id / grammar | created by | command |
+|---|---|---|---|---|
+| repo | Project v2 + labels + `.claude/orch.json` | Priority = `Now·Next·Later`; Feature, Pipeline options | Director | `/orch:board init` · `/orch:setup` |
+| milestone | Milestone (title · description · due) | `M1 · <objective>` · `target: <date>` · `done: <observable>` | Director | `/orch:milestone define` (→ `split` proposes goals, `close` acknowledges) |
+| goal = lane | Issue, label `orch:goal`, body = BRIEF | `G3` (= issue #) · `goal · metric · done · domains · kill · feature:` | Director (Coordinator may propose) | `/orch:goal` (Architect shapes if fuzzy/big) |
+| step | sub-issue; fields Priority, Feature, Pipeline | `S2` (ordinal) · body `text · outcome: · gate: · accept: · recipe:` | Architect (goal skill seeds small goals) | `add-item` |
+| YOU item | sub-issue, label `orch:you` | `<action>` | Coordinator (parks owner work) | `add-item --you` |
+| review round | `docs/reviews/` file | `M1.G3[.S2].R<r>` · `pass\|fail` · reasons | Gate reviewer | `orch review G3 [--step S2]` — launched by Dev/Architect, briefed by nobody |
+| status | Status field `Todo · In progress · In review · Done`; `orch:blocked` + `blocked: <owner>` comment | folded from items + reviews | Coordinator | `set-status · set-blocker · attention · close-goal` (close needs ledger evidence) |
+
+Who may write what (★ = role hook, else instructed):
+
+| | Director | Coordinator | Architect | Dev | Gate |
+|---|---|---|---|---|---|
+| Project / contract | ✎ | – | – | – | – |
+| Milestone | ✎ | read | read | – | – ★ agents refused |
+| Goal issue (BRIEF) | ✎ | propose | shape | – ★ | – |
+| Step items | – | status | ✎ add | – | – |
+| YOU items | do | ✎ add | – | – | – |
+| Feature / Pipeline | – | – | ✎ | – | – (inherited from `feature:`) |
+| Status / blocker | – | ✎ | – | – | – |
+| `docs/reviews/` | – | read | read | read | ✎ ★ sole writer |
+| code | – | – ★ | – ★ | ✎ | – ★ |
+
+Commands, five: `/orch:setup` (once per repo, Director) · `/orch:milestone`
+(define · split · close, Director only) · `/orch:goal` (one goal → BRIEF +
+issue + seeded steps, Director; Coordinator proposes) · `/orch:go` (drive
+one lane, Coordinator or today's single session) · `/orch:board` (init
+once, then look).
 
 ---
 
