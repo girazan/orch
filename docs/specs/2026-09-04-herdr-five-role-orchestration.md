@@ -4,7 +4,8 @@ Date: 2026-09-04 · Status: **brainstorm r2** — operator decisions in §5;
 r2 re-cuts the unit of work (goal = lane, milestone = board header) and
 splits review into an in-session checker and an independent gate, both
 launched from the working session (§2.8, r2.1); r2.2 adds steps for big
-goals with gate review per step (§2.7). Written against origin/main;
+goals with gate review per step (§2.7); r2.3 closes the open questions
+(§5.11–15) and adds recipes (§7). Written against origin/main;
 local main's `board-gh` work (GitHub Issues as the board) is referenced
 where vocabulary overlaps.
 No review round yet · Baseline: orch v0.7.0 (`6043bb4`) · Companion to
@@ -117,7 +118,9 @@ escalate), round 3 = fresh implementer one tier up.
 **Proposal.** Keep orch's rule and give it to the Coordinator — it is
 dispatch logic, so it lands in the right role for once. The Coordinator
 counts rounds from `reviews/<goal>.md` history, not from memory
-(statelessness, §2.6).
+(statelessness, §2.6). r2.3, from Ralphinho: the hand-back to Dev
+carries the review file **plus** the failing test output and any
+conflict context — never the verdict alone, never a bare retry.
 
 ### 2.5 Shipping is absent from the artifact
 
@@ -191,7 +194,7 @@ lane has **steps**:
 |---|---|---|---|
 | small (clear, fits one Dev context) | none | none | the goal: `M1.G3.R<r>` |
 | big (clear, too big for one context) | mandatory | ordered steps `S1…Sn`, each with an `accept:` line and `-> outcome`; the last step's `accept:` *is* the BRIEF's `done:` | **the step**: `M1.G3.S2.R<r>` |
-| open-ended ("either, but iterative") | mandatory | the first two or three steps written, the rest a placeholder; after each step passes, the Architect (or Dev, when cheap) appends the next | the step |
+| open-ended ("either, but iterative") | mandatory | two lists: `steps` (sharp, each with `accept:`) and `fog` (suspected decisions not yet sharp — Wayfinder's "not yet specified"); after each step passes, the Architect (or Dev, when cheap) graduates fog into the next step; a step may carry `decide: human` (HITL) at step level | the step |
 
 - A step is a **board item** — on the GitHub board that main ships
   (`board-gh`), it is one sub-issue of the goal issue, and the last one
@@ -366,7 +369,8 @@ reviewer prompt skeleton, different rubric file.
    skip this step entirely.
 4. `herdr agent start impl-G<k> --env ORCH_ROLE=dev`, prompt = the
    eight-section brief (`delegate.md`) whose CONTEXT names only this
-   lane's worklog + listed ADRs. Dev implements TDD-style, spawning
+   lane's worklog + listed ADRs and whose MUST DO opens with the step's
+   `recipe:` stages (§7). Dev implements TDD-style, spawning
    checkers as it likes, commits where the contract grants `ship:
    commit`, writes its handoff, then runs `orch review G<k>` — for a
    goal with steps, per step: `orch review G<k> --step S<j>` after each.
@@ -432,15 +436,96 @@ them. 7 and 8 came from the operator's r2 review of r1.
 10. **Id gains a step level: `M<n>.G<k>.S<j>.R<r>` (r2.2).** `S` =
    step, the ordinal of the item inside the goal. Small goals omit it.
 
-Still open (not asked; surfaced by the decisions): **milestone prefix**
-— main's `board-gh` titles milestones `C<n> …` while decision 5/7 says
-`M<n>`; one of them changes, and the README glossary with it. Whether
-`R0` for the plan review reads well once goals without an Architect
-start at `R1`. Whether a reviewer spawned by `orch review` should
-register in the fleet roster (visible in the FLEET footer) or stay a
-plain subagent. Whether `S<j>` should be the item's ordinal (readable)
-or its sub-issue number (stable under reordering) — the hand-run in §6
-should tell.
+11. **Milestone prefix is `M<n>` (r2.3).** main's `board-gh` currently
+   titles milestones `C<n> …`; that changes to `M<n>` in board-gh, the
+   go and goal skills, and the README glossary — one small commit on
+   main, owner's (YOU-lane item, not done here).
+12. **Plan review stays `R0` (r2.3).** Code rounds start at `R1`;
+   unshaped goals simply have no `R0`.
+13. **`orch review` registers its reviewer in the fleet roster (r2.3).**
+   Role `reviewer`, entry written at spawn, removed on exit — visible in
+   the FLEET footer and to the fleet-context watchdog.
+14. **`S<j>` is the step's ordinal in the plan section (r2.3).** Readable
+   and sortable; inserting or reordering steps does not renumber
+   existing review files (they keep the number they were written with).
+15. **Recipes are in: §7 (r2.3).** Seven one-page recipes selected per
+   goal or step at route time; stages map to installed skills; gates
+   and hooks are recipe-independent.
+
+Nothing surfaced by the decisions is still open. What the hand-run in
+§6 should still measure is listed there.
+
+## 7. Recipes — the workflow type is a route-time choice (r2.3)
+
+Studied for this section: ECC (`affaan-m/ECC`, in particular its
+`autonomous-loops` skill and the Ralphinho DAG) and `mattpocock/skills`
+(`implement`, `tdd`, `diagnosing-bugs`, `wayfinder`, `triage`). They sit
+at different layers: Pocock's repo is **disciplines** (small,
+model-invoked, one kind of work each; user-invoked commands merely
+sequence them), ECC is a **catalog and harness OS** (286 skills, rules,
+hooks, learning) whose one transferable idea is Ralphinho's *pipeline
+depth chosen by unit complexity*; orch is **governance**. orch's
+lineage already credits both. The combination that respects all three:
+
+**A recipe is the named sequence of stages between the BRIEF and the
+gate.** It is chosen per goal, or per step of a big goal, in the route
+phase, and written into the ROUTE line as `recipe:<name>`. It changes
+*what the working role does* and *what the gate rubric adds*. It never
+changes what orch enforces: contract and ship gate, role hooks, gate
+reviewer independence, review files, ids, size budgets are identical
+under every recipe.
+
+| recipe | shape it fits | stages (BRIEF → gate) | gate rubric adds | evidence in the ledger |
+|---|---|---|---|---|
+| `spec` | fuzzy or big; spec-driven | brainstorm/grill → spec → `R0` plan review → steps | plan covers `done:`; each step's `accept:` machine-checkable | plan section, `R0` file |
+| `tdd` | clear behaviour, testable seams | red test at the agreed seam → green → refactor | green-can-go-red (revert fix, test must fail) | the red run's output before the green |
+| `iterate` | a number to move, cause unknown | hypothesis (written first) → change → measure → keep\|revert\|flat | delta outside the noise band; `⚠complexity` weighed | `iter <n> · before → after` lines (today's ledger grammar) |
+| `debug` | something is broken | reproduce → hypothesis → bisect/inspect → fix → regression test | a test that was **red before the fix** exists; root cause named, no band-aid | the repro command + its output, red then green |
+| `research` | knowledge gap | search → grade sources → findings note | sources cited and graded; no code changed | `research:` section in the worklog |
+| `cleanup` | slop after a feature landed | separate pass, separate agent: remove redundant checks, dead code, tests of the language | behaviour preserved: existing tests unchanged and green; the diff **deletes** | test verdict line, `-`/`+` line counts |
+| `fast` | trivial, spec-complete | implement → test | — (mechanical step only) | test verdict line |
+
+Rules that keep this from becoming a catalog:
+
+- **One page per recipe**, in `skills/go/recipes/<name>.md`: the stage
+  list, which discipline each stage invokes, the rubric additions, the
+  evidence required. A recipe that needs more than one page is two
+  recipes, or a discipline that belongs downstream.
+- **orch writes no disciplines.** Each stage names a skill through the
+  existing `workflow.tools` map, defaulting to what is installed:
+  `superpowers:brainstorming` / `writing-plans` /
+  `test-driven-development` / `systematic-debugging`, or Pocock's
+  `tdd` / `diagnosing-bugs` / `research` / `grilling`, else the native
+  fallback the goal skill already has. Swapping a discipline is a config
+  edit, not a plugin release.
+- **Mixing is per step, not per goal.** A big goal may route step 1 as
+  `research`, step 2 as `spec`, steps 3–5 as `tdd`, and a late step as
+  `debug` — the Architect writes `recipe:` beside each step's `accept:`
+  line; the Coordinator applies it to the Dev brief.
+- **The gate reads the recipe.** `orch review G<k> [--step S<j>]` loads
+  `review-goal.md` plus the recipe's rubric additions, so a `debug` step
+  is judged on "was the test red first" and an `iterate` step on "is it
+  outside the band" — without the reviewer being told anything by Dev.
+
+Three smaller borrows, folded in where they land:
+
+- **Ralphinho's retry rule** (never just retry; feed the failure
+  context forward): the fix-loop hand-back to Dev carries the review
+  file *plus* the failing test output and any conflict context, not the
+  verdict alone. → §2.4.
+- **Wayfinder's fog** for open-ended goals: the plan section of an
+  "either, but iterative" goal has two lists — `steps` (sharp enough to
+  have an `accept:`) and `fog` (suspected decisions, not yet sharp).
+  Ticket a step "when the question is already sharp, even if blocked".
+  Wayfinder's HITL/AFK marker per ticket maps onto the contract's
+  `decide: human|ai` applied at step level. → §2.7.
+- **Triage labels** `ready-for-agent` / `ready-for-human` are the YOU
+  lane as issue labels on the GitHub board. → board-gh, later.
+
+Not borrowed, on purpose: ECC's language packs, rules bundles, instinct
+learning and multi-harness adapters (catalog weight orch does not want),
+and Pocock's `implement` as a command (orch's Dev brief plus a recipe
+already is that sequence).
 
 ## 6. What would prove this is right
 
@@ -450,7 +535,9 @@ roles as panes with `ORCH_ROLE` set but nothing enforcing it. Count: how
 many times a role crossed its "does not" column; how many lines each
 handoff needed; whether the Coordinator ever *needed* a worklog; how
 many checker rounds Dev ran per gate round (r2 — tells whether the
-inner/outer split pays). Those numbers decide §3.2's priority order,
+inner/outer split pays); which recipes were actually used and whether
+any step wanted one that does not exist (r2.3 — tells whether seven is
+too many or too few). Those numbers decide §3.2's priority order,
 §5.1's answer and the last open question in §5. Log them in this lane's
 worklog as the brainstorm's first ledger line.
 
