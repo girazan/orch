@@ -5,7 +5,7 @@ r2 re-cuts the unit of work (goal = lane, milestone = board header) and
 splits review into an in-session checker and an independent gate, both
 launched from the working session (§2.8, r2.1); r2.2 adds steps for big
 goals with gate review per step (§2.7); r2.3 closes the open questions
-(§5.11–15) and adds recipes (§7); r2.4 gives milestones a command (§5.16); r2.5 records the project hierarchy (§8); r2.6 the skill routing map (§9). Written against origin/main;
+(§5.11–15) and adds recipes (§7); r2.4 gives milestones a command (§5.16); r2.5 records the project hierarchy (§8); r2.6 the skill routing map (§9); r2.7 domains = features, prioritise verb, no sixth command (§5.18–20). Written against origin/main;
 local main's `board-gh` work (GitHub Issues as the board) is referenced
 where vocabulary overlaps.
 No review round yet · Baseline: orch v0.7.0 (`6043bb4`) · Companion to
@@ -477,6 +477,27 @@ them. 7 and 8 came from the operator's r2 review of r1.
    + `workflow.tools`; explicit → preferred installed → native; resolved
    skill recorded in the ROUTE line; gate rubric extended never
    replaced; Coordinator has no row. Table in §9.
+18. **Domains are features — one vocabulary (r2.7).** The contract's
+   domain names ARE the Project's Feature options. Contract is the
+   source, board the mirror: `/orch:board init` seeds Feature options
+   from domain names; `/orch:setup` adding or renaming a domain updates
+   the option; nobody edits Feature options by hand. The BRIEF's
+   `feature:` is its primary `domains:` entry; a goal spanning several
+   domains names the primary on the goal and each step item carries its
+   own Feature. Route classification (paths, expertise, strictest-wins)
+   is unchanged. (Operator's call over a two-vocabulary bridge; the
+   cost accepted: a feature rename is a contract edit + lock update.)
+19. **Reprioritising (r2.7).** Steps within a goal: `board-gh move
+   <item> --bucket …` (exists) — Architect at plan time, Coordinator when
+   fog graduates. Goals within a milestone: `/orch:milestone prioritize`
+   — Director's; writes the order as the goals' Priority values, and
+   the Coordinator's lane-pick rule reads that order before
+   "most recently touched".
+20. **No sixth command (r2.7).** One command per *who*, verbs for *what*:
+   setup = contract · milestone = scope · goal = one piece of work · go =
+   drive · board = look. Recipes are never commands (a `/orch:tdd` would
+   skip the route phase where the contract check lives). `orch review`
+   stays a script, not a skill, so nobody can brief it.
 
 Nothing surfaced by the decisions is still open. What the hand-run in
 §6 should still measure is listed there.
@@ -571,8 +592,8 @@ worklog as the brainstorm's first ledger line.
 
 | level | GitHub object | id / grammar | created by | command |
 |---|---|---|---|---|
-| repo | Project v2 + labels + `.claude/orch.json` | Priority = `Now·Next·Later`; Feature, Pipeline options | Director | `/orch:board init` · `/orch:setup` |
-| milestone | Milestone (title · description · due) | `M1 · <objective>` · `target: <date>` · `done: <observable>` | Director | `/orch:milestone define` (→ `split` proposes goals, `close` acknowledges) |
+| repo | Project v2 + labels + `.claude/orch.json` | Priority = `Now·Next·Later`; Feature options = contract domain names (mirrored); Pipeline options | Director | `/orch:board init` · `/orch:setup` |
+| milestone | Milestone (title · description · due) | `M1 · <objective>` · `target: <date>` · `done: <observable>` | Director | `/orch:milestone define` (→ `split` proposes goals, `prioritize` orders them, `close` acknowledges) |
 | goal = lane | Issue, label `orch:goal`, body = BRIEF | `G3` (= issue #) · `goal · metric · done · domains · kill · feature:` | Director (Coordinator may propose) | `/orch:goal` (Architect shapes if fuzzy/big) |
 | step | sub-issue; fields Priority, Feature, Pipeline | `S2` (ordinal) · body `text · outcome: · gate: · accept: · recipe:` | Architect (goal skill seeds small goals) | `add-item` |
 | YOU item | sub-issue, label `orch:you` | `<action>` | Coordinator (parks owner work) | `add-item --you` |
