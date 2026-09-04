@@ -29,6 +29,49 @@ proposes what orch should adopt, and records the operator's decisions on
 the questions only they could answer (§5). It deliberately does not pick
 releases or write hook code.
 
+## 0. Target architecture — wrap-up (r2.8, 24 decisions)
+
+```
+ DIRECTOR (you)         scope: milestone · goals · contract · ADRs · decide:human · stalls
+     │  /orch:setup  /orch:milestone  /orch:goal        (only where amber; else never)
+     ▼
+ COORDINATOR            native | loop (/loop 10m /orch:go) | herdr pane · one per repo
+   reads board · latest handoff · latest review — never code · never a verdict
+   one action per tick · pulse line · proposes goals, never creates
+     │ starts panes with ORCH_ROLE=…
+     ├─► ARCHITECT   goal-sized, only if fuzzy/big · plan: steps[] + fog[] · recipe per step · ADRs · ≤5 questions
+     ├─► DEV         fresh pane per step · recipe stages via stage→skill map · checkers ×n · commits per contract
+     └─► GATE        spawned by `orch review`, launched by Dev/Architect, briefed by NOBODY · sole writer of docs/reviews/
+
+ UNITS   M1 milestone (GitHub Milestone: M<n> · objective · target · done)
+          └ G3 goal = lane (issue orch:goal, BRIEF: goal·metric·done·domains·feature·kill)
+             └ S2 step (sub-issue: text·outcome·gate·accept·recipe) — big goals only
+                └ R1 gate review round (docs/reviews/M1.G3.S2.R1.md) · R0 = plan review
+
+ FLOW    BRIEF → [Architect → R0] → per step { Dev → orch review → pass | fail ≤3 (+ctx, no bare retry) }
+         → merge gate once/goal (suite · metric>noise · root cause) → ship per contract → close-goal
+         → Coordinator proposes next goal → Director creates or closes M1
+
+ RECIPES spec · tdd · iterate · debug · research · cleanup · fast — route-time choice per goal/step;
+         stages → installed skills (prefer: superpowers, mattpocock, native); gates never change
+
+ STATE   GitHub board (source for scope/status) · worklog (plan+ledger) · docs/adr · tmp/handoffs (scratch)
+         docs/reviews (evidence, git) · .claude/orch-audit.jsonl (rulings, gates, pulses)
+
+ HOOKS   ship rank vs contract · destructive git · protected dirs · read-before-write ·
+   (★)   role: reviewer no Edit/ship · only reviewer writes reviews · coordinator no code ·
+         dev no BRIEF/board · architect no dev paths · no Stop without handoff
+ ADVISORY size budgets (board 1 screen · plan ≤300 lines/≤7 steps · handoff ≤40) · roster · no-progress N=2
+
+ COMMANDS  /orch:setup · /orch:milestone (define·split·prioritize·close) · /orch:goal · /orch:go · /orch:board
+           one command per WHO, verbs for WHAT · recipes are never commands · `orch review` is a script
+```
+
+Delivery: five plans on `main` — (1) milestone + vocabulary, (2) recipes +
+skill routing, (3) role hooks, (4) `orch review`, (5) coordinator vehicles
+(loop first, herdr second). 1 first; 2 ∥ 3; 4 after 3; 5 after 3+4.
+Before any hook: the §6 hand-run, on the `loop` vehicle.
+
 ## 1. Crosswalk — same thing, two vocabularies
 
 | Herdr artifact | orch today | Fit |
