@@ -5,7 +5,7 @@ r2 re-cuts the unit of work (goal = lane, milestone = board header) and
 splits review into an in-session checker and an independent gate, both
 launched from the working session (§2.8, r2.1); r2.2 adds steps for big
 goals with gate review per step (§2.7); r2.3 closes the open questions
-(§5.11–15) and adds recipes (§7); r2.4 gives milestones a command (§5.16); r2.5 records the project hierarchy (§8); r2.6 the skill routing map (§9); r2.7 domains = features, prioritise verb, no sixth command (§5.18–20). Written against origin/main;
+(§5.11–15) and adds recipes (§7); r2.4 gives milestones a command (§5.16); r2.5 records the project hierarchy (§8); r2.6 the skill routing map (§9); r2.7 domains = features, prioritise verb, no sixth command (§5.18–20); r2.8 loop vehicle, pulse line, no-progress rule, fresh Dev per step (§5.21–24). Written against origin/main;
 local main's `board-gh` work (GitHub Issues as the board) is referenced
 where vocabulary overlaps.
 No review round yet · Baseline: orch v0.7.0 (`6043bb4`) · Companion to
@@ -200,10 +200,11 @@ lane has **steps**:
   (`board-gh`), it is one sub-issue of the goal issue, and the last one
   carries the `gate:` marker. `S<k>` is the step's ordinal inside the
   goal, so a review file reads without opening GitHub.
-- Dev is a **resident** pane for the lane (`impl-G3`) and works the
-  steps in order with the worklog as memory between them — the resident
-  row of `delegate.md`. Step commits land where the contract grants
-  `ship: commit`.
+- Dev is a **fresh pane per step** by default (§5.24): context reset
+  each step, the worklog as memory between them; resident only across
+  fix rounds 1–2 inside a step, or when `delegate.md`'s asset-or-
+  liability rule says its context is worth keeping. Step commits land
+  where the contract grants `ship: commit`.
 - The **gate review runs per step**, which is the whole point: every
   reviewed diff stays small, the three-round cap has a chance, and a
   failed step stops the lane before the next step builds on it. The
@@ -498,6 +499,28 @@ them. 7 and 8 came from the operator's r2 review of r1.
    drive · board = look. Recipes are never commands (a `/orch:tdd` would
    skip the route phase where the contract check lives). `orch review`
    stays a script, not a skill, so nobody can brief it.
+21. **Heartbeat vehicle for the Coordinator (r2.8).** `workflow.coordinator`
+   gains a third value: `native | loop | herdr`. `loop` = `/loop <interval>
+   /orch:go` in a plain session — a stateless Coordinator with no Herdr;
+   the cheapest way to run the §6 hand-run. (From explainx's
+   loop-orchestrator: a heartbeat is a persistent presence returning to
+   the same standing context with durable memory, not a cron job.)
+22. **Pulse line (r2.8).** Every Coordinator tick appends one audit entry
+   `{ts, by:"pulse", lane, action|"idle"}` — including "nothing to do" —
+   so silence is distinguishable from death. `/orch:board`'s stale flag
+   reads last-pulse age, not last-edit age. Pulses never ticket noise:
+   surface, don't auto-act.
+23. **No-progress detection (r2.8).** Loop preflight item 6 and a fix-loop
+   rule: the same error text, an empty diff, or the same failing test
+   twice in a row → stop and park (loop) / escalate (fix loop). Broader
+   than the stall rule, which only sees review findings.
+24. **Fresh Dev per step (r2.8).** Default flipped: a big goal gets a
+   fresh Dev pane per step with the worklog as memory (Ralph-style
+   context reset, progress on disk); the pane is resident only across
+   fix rounds 1–2 within a step. `delegate.md`'s asset-or-liability rule
+   still allows carrying a pane over when its context is an asset.
+   Cost stated plainly: parallel loops trade the Director's flow for
+   steady stress — the touchpoint list in §4 is the mitigation.
 
 Nothing surfaced by the decisions is still open. What the hand-run in
 §6 should still measure is listed there.
