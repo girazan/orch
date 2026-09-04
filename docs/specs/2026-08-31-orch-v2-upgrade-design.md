@@ -235,6 +235,10 @@ dispatch/teardown/rebrief entries).
 
 Herdr delegates register with `vehicle: "herdr"`; herdr launches go
 through the shell and bypass the tier gate (**documented, ADVISORY**).
+What the herdr vehicle could grow into — role panes (Coordinator /
+Architect / Dev / Reviewer), file-carried handoffs and reviews,
+role-scoped guardrails — is brainstormed in
+`2026-09-04-herdr-five-role-orchestration.md` (not yet design).
 Vehicle adapter contract: {runtime id, context/transcript reader or
 `null`, status probe, teardown op}; herdr's context reader is `null`.
 
