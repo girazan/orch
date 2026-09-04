@@ -3,7 +3,10 @@
 Date: 2026-09-04 · Status: **brainstorm r2** — operator decisions in §5;
 r2 re-cuts the unit of work (goal = lane, milestone = board header) and
 splits review into an in-session checker and an independent gate, both
-launched from the working session (§2.8, r2.1).
+launched from the working session (§2.8, r2.1); r2.2 adds steps for big
+goals with gate review per step (§2.7). Written against origin/main;
+local main's `board-gh` work (GitHub Issues as the board) is referenced
+where vocabulary overlaps.
 No review round yet · Baseline: orch v0.7.0 (`6043bb4`) · Companion to
 `2026-08-31-orch-v2-upgrade-design.md` §3 (Coordination) — this note is
 what §3.2's `workflow.coordinator: "herdr"` vehicle could grow into.
@@ -180,6 +183,38 @@ Dev still receives only its lane's BRIEF plus named ADRs — the "never
 reads the full plan" rule now holds because the full plan is the board,
 and Dev never reads the board.
 
+**Big goals: steps (r2.2, decided §5.9–5.10).** A goal may be small,
+big, or open-ended. All three are one lane; what changes is whether the
+lane has **steps**:
+
+| Goal shape | Architect | Plan section | Unit of review |
+|---|---|---|---|
+| small (clear, fits one Dev context) | none | none | the goal: `M1.G3.R<r>` |
+| big (clear, too big for one context) | mandatory | ordered steps `S1…Sn`, each with an `accept:` line and `-> outcome`; the last step's `accept:` *is* the BRIEF's `done:` | **the step**: `M1.G3.S2.R<r>` |
+| open-ended ("either, but iterative") | mandatory | the first two or three steps written, the rest a placeholder; after each step passes, the Architect (or Dev, when cheap) appends the next | the step |
+
+- A step is a **board item** — on the GitHub board that main ships
+  (`board-gh`), it is one sub-issue of the goal issue, and the last one
+  carries the `gate:` marker. `S<k>` is the step's ordinal inside the
+  goal, so a review file reads without opening GitHub.
+- Dev is a **resident** pane for the lane (`impl-G3`) and works the
+  steps in order with the worklog as memory between them — the resident
+  row of `delegate.md`. Step commits land where the contract grants
+  `ship: commit`.
+- The **gate review runs per step**, which is the whole point: every
+  reviewed diff stays small, the three-round cap has a chance, and a
+  failed step stops the lane before the next step builds on it. The
+  **merge gate runs once**, at goal end, on the BRIEF's metric.
+- The plan review `R0` checks the split itself: steps ordered, each
+  fits one Dev context, the last `accept:` equals `done:`.
+- **Too big even for steps** — the size budget is the tripwire: a plan
+  section that cannot stay under ~300 lines or needs more than ~7 steps
+  is not one goal. The Architect then proposes a split into several
+  lanes under the same milestone in its handoff, as a proposed ADR; the
+  Director approves (creating lanes is theirs, §5.7). Herdr's rule
+  applies one level down: if a *step* cannot fit, the Architect split
+  it wrong.
+
 ### 2.8 Review: in-session checker vs independent gate (r2)
 
 Operator's point: Dev works TDD-style once the spec is fixed, and an
@@ -227,11 +262,11 @@ Keep orch's paths (git-tracked board and ADRs are non-negotiable — the
 board's `git log` is the goal journal). Add two directories:
 
 ```
-docs/BOARD.md                          # header = milestone M<n>; one row per goal (lane); one screen
+docs/BOARD.md  → on main: GitHub board # milestone → goal issue G<n> → items (steps); `board-gh read` is the one-screen view
 docs/adr/NNNN-<slug>.md                # unchanged; Director answers → accepted
 tmp/worklogs/G<k>-<name>.md            # the goal's plan: BRIEF · (optional plan section) · ledger
-tmp/handoffs/M<n>.G<k>-<role>.md       # ≤40 lines: changed · blocked · decided
-docs/reviews/M<n>.G<k>.R<r>.md         # pass|fail · blocking reasons (each cites the BRIEF's done: or a plan step) · notes
+tmp/handoffs/M<n>.G<k>[.S<j>]-<role>.md   # ≤40 lines: changed · blocked · decided
+docs/reviews/M<n>.G<k>[.S<j>].R<r>.md     # pass|fail · blocking reasons (each cites done: or the step's accept:) · notes
 ```
 
 Reviews are git-tracked because they are the evidence the ship gate and
@@ -240,13 +275,15 @@ once by the next role). Decided (§5.4). With goal = lane both multiply
 per lane rather than per sub-goal — fine for reviews, and one more
 reason handoffs stay scratch.
 
-**Id grammar (decided §5.5, amended §5.7):** `M<n>` milestone (board
-header) · `G<k>` goal = lane (global, never reused — today's `C<n>`
-rule) · `M<n>.G<k>.R<r>` review round — e.g. `M1.G3.R2`. The plan
-review of a shaped goal is `R0`. **Rename consequence shrinks:** lanes
-go `C<n>` → `G<n>` (a prefix swap with a legacy-`C` read path in board,
-goal, go and the grammar tests); `M<n>` is *added* to the header, so
-nothing existing moves. Still its own step, but a small one.
+**Id grammar (decided §5.5, amended §5.7 and §5.10):** `M<n>` milestone
+· `G<k>` goal = lane (the goal issue's number on the GitHub board —
+global, never reused) · `S<j>` step (ordinal inside the goal; only for
+goals with a plan section) · `R<r>` review round. Examples: `M1.G3.R2`
+(small goal, second review) · `M1.G3.S2.R1` (big goal, step 2, first
+review) · `M1.G3.R0` (plan review). **Rename consequence (r2.2):** main
+already ships lanes as `G<n>` and the milestone as GitHub's Milestone,
+so nothing renames on the lane side. One conflict remains: main titles
+milestones `C<n> …`, this spec says `M<n>` — see Still open.
 
 ### 3.2 Role-scoped guardrails (new; the interesting part)
 
@@ -262,7 +299,7 @@ first time orch could enforce *who* does something, not only *what*.
 | Only the gate reviewer writes a verdict (r2, §2.8) | `Edit\|Write` under `docs/reviews/` denied for every role but `reviewer`; a checker subagent inherits its parent pane's role; only `orch review` sets `ORCH_ROLE=reviewer`, with a brief template that takes no caller text | ENFORCED* (role) · INSTRUCTED + test (template) |
 | Coordinator "never reads code / full plan" | PreToolUse `Read` outside `docs/BOARD.md`, `tmp/handoffs/`, `docs/reviews/`, `.claude/orch.json` denied for coordinator | ENFORCED* (advisory value: catches drift, not intent) |
 | Every role ends by writing its handoff | Stop hook (`session-hygiene` extension): pane with a role and edits but no `tmp/handoffs/<goal>-<role>.md` newer than session start → refuse to stop once, name the file | ENFORCED* |
-| Size budgets: board one screen, worklog plan section ≤300 lines, handoff ≤40 | Stop-time line counts on the files the session touched | ADVISORY |
+| Size budgets: board one screen, worklog plan section ≤300 lines / ≤7 steps, handoff ≤40 | Stop-time line counts on the files the session touched; over budget → "not one goal, propose a lane split" | ADVISORY |
 | Dev "does not change scope or plan" | Dev denied `Edit\|Write` on the worklog's BRIEF block and on `docs/BOARD.md`; ledger appends allowed | ENFORCED* for paths, INSTRUCTED for meaning |
 | Architect "does not write production code" | Dev-domain paths denied for architect; `docs/adr/`, worklog allowed | ENFORCED* |
 | Verdict is `pass\|fail` with reasons tied to `done:` / plan steps | Coordinator refuses to advance on a review file missing the grammar; test in `test-grammar.js` | INSTRUCTED + grammar test |
@@ -331,17 +368,21 @@ reviewer prompt skeleton, different rubric file.
    eight-section brief (`delegate.md`) whose CONTEXT names only this
    lane's worklog + listed ADRs. Dev implements TDD-style, spawning
    checkers as it likes, commits where the contract grants `ship:
-   commit`, writes its handoff, then runs `orch review G<k>`.
+   commit`, writes its handoff, then runs `orch review G<k>` — for a
+   goal with steps, per step: `orch review G<k> --step S<j>` after each.
 5. The command spawns the gate reviewer(s) with `ORCH_ROLE=reviewer`
    (`review-goal.md`, detached worktree of Dev's SHA, second reviewer
    from `review-alt` when the route says `dual`) →
-   `docs/reviews/M1.G<k>.R<r>.md`. Dev waits for the file.
+   `docs/reviews/M1.G<k>[.S<j>].R<r>.md`. Dev waits for the file.
 6. fail → Dev reads the file and fixes; round rule from §2.4 applies
-   (the Coordinator counts rounds from the files: resume ×2, then fresh
-   Dev one tier up, then stall → Director). pass → Dev's handoff says so
-   and Dev finishes; the Coordinator reads the review, runs the merge
-   gate (three legs) on this lane, writes the GATE block, ships per
-   `ship:`, flips the board row `merged`, tears the panes down.
+   per step (the Coordinator counts rounds from the files: resume ×2,
+   then fresh Dev one tier up, then stall → Director). pass on a step →
+   the Coordinator ticks the board item and Dev moves to the next step
+   (open-ended goals: the Architect appends one first). pass on the
+   last step, or on a small goal → Dev's handoff says so and Dev
+   finishes; the Coordinator reads the review, runs the merge gate
+   (three legs, once per goal) on this lane, writes the GATE block,
+   ships per `ship:`, closes the goal, tears the panes down.
 7. Coordinator proposes the next goal or, when the milestone's goals are
    all `merged`, writes the milestone summary and blocks for the
    Director.
@@ -383,13 +424,23 @@ them. 7 and 8 came from the operator's r2 review of r1.
    `docs/reviews/` — enforced by the role hook. Chosen over
    Coordinator-launched (slower) and Dev-briefed (no independent
    reader).
+9. **Big goals get steps; gate review per step, merge gate once per goal
+   (r2.2).** A step is a board item (sub-issue). Dev is a resident pane
+   working steps in order. Open-ended goals write the first few steps
+   and append as they go. Over ~300 lines or ~7 steps → not one goal,
+   propose a lane split to the Director.
+10. **Id gains a step level: `M<n>.G<k>.S<j>.R<r>` (r2.2).** `S` =
+   step, the ordinal of the item inside the goal. Small goals omit it.
 
-Still open (not asked; surfaced by the decisions): whether the `C`→`G`
-lane rename lands before or with the first `M`-headed board; whether
+Still open (not asked; surfaced by the decisions): **milestone prefix**
+— main's `board-gh` titles milestones `C<n> …` while decision 5/7 says
+`M<n>`; one of them changes, and the README glossary with it. Whether
 `R0` for the plan review reads well once goals without an Architect
-start at `R1`; and whether a reviewer spawned by `orch review` should
+start at `R1`. Whether a reviewer spawned by `orch review` should
 register in the fleet roster (visible in the FLEET footer) or stay a
-plain subagent — the hand-run in §6 should tell.
+plain subagent. Whether `S<j>` should be the item's ordinal (readable)
+or its sub-issue number (stable under reordering) — the hand-run in §6
+should tell.
 
 ## 6. What would prove this is right
 
