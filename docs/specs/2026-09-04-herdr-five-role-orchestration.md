@@ -2,7 +2,8 @@
 
 Date: 2026-09-04 · Status: **brainstorm r2** — operator decisions in §5;
 r2 re-cuts the unit of work (goal = lane, milestone = board header) and
-splits review into an in-session checker and an independent gate (§2.8).
+splits review into an in-session checker and an independent gate, both
+launched from the working session (§2.8, r2.1).
 No review round yet · Baseline: orch v0.7.0 (`6043bb4`) · Companion to
 `2026-08-31-orch-v2-upgrade-design.md` §3 (Coordination) — this note is
 what §3.2's `workflow.coordinator: "herdr"` vehicle could grow into.
@@ -186,25 +187,37 @@ Architect debugging a plan needs fast iteration; a Reviewer pane per
 round is too slow for that inner loop, so the reviewer should be spawned
 in-session by Dev and by the Architect.
 
-Agreed for the inner loop; not for the gate. orch's first-line thesis is
-*two independent readers*, and `delegate.md` already rules that subagents
-never spawn their own reviewers — a reviewer briefed by the one being
-judged inherits its framing, and the judged party then interprets its
-own verdict. So the two are separated by *who launches* and *what the
-output may touch*:
+Agreed — with one distinction that keeps orch's first-line thesis (*two
+independent readers*) intact: **launched by** and **briefed by** are
+separable. `delegate.md`'s rule that subagents never spawn their own
+reviewers exists because a reviewer briefed by the one being judged
+inherits its framing, and the judged party then reads its own verdict
+as it likes. Neither problem is about which process forks the reviewer.
+So both review kinds are launched from inside Dev's or the Architect's
+session; what differs is who writes the brief and what the output may
+touch (decided, §5.8):
 
 | | Checker (inner loop) | Gate reviewer |
 |---|---|---|
-| launched by | Dev or Architect, in-session, as often as wanted | the Coordinator, never the judged role |
-| runtime | throwaway subagent; any tier; may share Dev's framing | fresh context, `tiers.review` floor, second one from `models.review-alt`; a subagent of the Coordinator's session or an ephemeral pane — a pane is **not required** (nobody attaches to a reviewer; INCONCLUSIVE reaches the Director through the file) |
+| launched by | Dev or Architect, in-session, as often as wanted | Dev or Architect, in-session, when they believe the goal (or plan) is done |
+| briefed by | the caller, freely | **nobody** — a fixed command, `orch review G<k>` (`--plan` for `R0`), assembles the brief: rubric file, `git diff <base>..<sha>`, the handoff, the BRIEF; the caller's only input is "I'm ready" |
+| runtime | throwaway subagent; any tier; may share the caller's framing | fresh context spawned by the command with `ORCH_ROLE=reviewer` overriding the parent pane's role; `tiers.review` floor; second reviewer from `models.review-alt` when the route says `dual`; no pane (nobody attaches to a reviewer; INCONCLUSIVE reaches the Director through the file) |
 | rubric | whatever the caller asks: run the suite, red-green check, "poke at this diff" | `review-goal.md` / `review-plan.md` (§3.4), tests on a detached worktree (§2.3) |
-| output | advice in the caller's context; ledger line at most | `docs/reviews/M<n>.G<k>.R<r>.md`, the only thing the Coordinator acts on |
+| output | advice in the caller's context; ledger line at most | `docs/reviews/M<n>.G<k>.R<r>.md` — Dev reads it to fix on fail; the Coordinator reads it to flip on pass and counts rounds from the files |
 | status | ADVISORY — review as a *tool* | the *gate* — flips the lane, cited by the ship gate |
+
+What this buys: no Coordinator round trip between "done" and "judged",
+so the inner loop stays fast, and the Coordinator gets *more* stateless —
+it reacts to review files appearing rather than scheduling reviews.
+What it costs: the fixed command is now load-bearing. It must be the
+only path that runs with `ORCH_ROLE=reviewer`, and its brief template
+must not accept caller text. Both are testable.
 
 The role guardrail (§3.2) is what makes this a mechanism rather than a
 habit: a checker spawned inside a dev-role pane inherits `ORCH_ROLE=dev`,
-so the hook denies it (and Dev) any write under `docs/reviews/`. Only a
-reviewer-role process can produce the file the Coordinator reads.
+so the hook denies it (and Dev) any write under `docs/reviews/`. Only
+the process the review command spawns carries the reviewer role, and
+only it can produce the file the Coordinator reads.
 
 ## 3. What orch would adopt
 
@@ -246,7 +259,7 @@ first time orch could enforce *who* does something, not only *what*.
 | Rule | Mechanism | Label |
 |---|---|---|
 | Reviewer "does not fix what it finds" | PreToolUse `Edit\|Write` denied when `ORCH_ROLE=reviewer` (except under `docs/reviews/`); ship gate denies `commit`/`push` for reviewer regardless of contract | ENFORCED* |
-| Only the gate reviewer writes a verdict (r2, §2.8) | `Edit\|Write` under `docs/reviews/` denied for every role but `reviewer`; a checker subagent inherits its parent pane's role | ENFORCED* |
+| Only the gate reviewer writes a verdict (r2, §2.8) | `Edit\|Write` under `docs/reviews/` denied for every role but `reviewer`; a checker subagent inherits its parent pane's role; only `orch review` sets `ORCH_ROLE=reviewer`, with a brief template that takes no caller text | ENFORCED* (role) · INSTRUCTED + test (template) |
 | Coordinator "never reads code / full plan" | PreToolUse `Read` outside `docs/BOARD.md`, `tmp/handoffs/`, `docs/reviews/`, `.claude/orch.json` denied for coordinator | ENFORCED* (advisory value: catches drift, not intent) |
 | Every role ends by writing its handoff | Stop hook (`session-hygiene` extension): pane with a role and edits but no `tmp/handoffs/<goal>-<role>.md` newer than session start → refuse to stop once, name the file | ENFORCED* |
 | Size budgets: board one screen, worklog plan section ≤300 lines, handoff ≤40 | Stop-time line counts on the files the session touched | ADVISORY |
@@ -269,7 +282,7 @@ The artifact names models; orch names roles and pins them once in
 |---|---|---|---|
 | Coordinator | `frontier` (decided, §5.1); candidate for `mid` once §3.2 hooks exist and one milestone has run clean | medium | cheapness is *earned* by the guardrails, not assumed |
 | Architect | `frontier` | high | goal-sized, optional (§2.7); the only role that changes a BRIEF |
-| Gate reviewer | `tiers.review` floor, never below `high`; second from `models.review-alt` (decided, §5.3) | high | launched by the Coordinator only (§2.8) |
+| Gate reviewer | `tiers.review` floor, never below `high`; second from `models.review-alt` (decided, §5.3) | high | launched from Dev's or the Architect's session via `orch review`, never briefed by them (§2.8) |
 | Checker | any tier the caller picks | — | in-session tool of Dev/Architect; advisory (§2.8) |
 | Dev | `tiers.work` floor ∨ the BRIEF's ROUTE `tier:` — **strictest wins** | as needed | this *is* the "Dev model per goal" answer: route phase proposes, contract floors it, Coordinator applies |
 
@@ -309,22 +322,26 @@ reviewer prompt skeleton, different rubric file.
    `herdr agent start architect-G<k> --env ORCH_ROLE=architect`. The
    Architect researches, interviews (≤5 questions, each blocks the
    pane; answers → accepted ADRs), writes the plan section into the
-   worklog and its ADRs, may spawn checkers while it iterates, writes
-   `tmp/handoffs/M1.G<k>-architect.md`, done. Coordinator then launches
-   a gate review with `review-plan.md` → `docs/reviews/M1.G<k>.R0.md`;
-   fail → back to the Architect with the file. Clear or debugging goal →
+   worklog and its ADRs, may spawn checkers while it iterates, then runs
+   `orch review G<k> --plan` → `docs/reviews/M1.G<k>.R0.md`; fail → it
+   revises and re-runs; pass → it writes
+   `tmp/handoffs/M1.G<k>-architect.md`, done. Clear or debugging goal →
    skip this step entirely.
 4. `herdr agent start impl-G<k> --env ORCH_ROLE=dev`, prompt = the
    eight-section brief (`delegate.md`) whose CONTEXT names only this
    lane's worklog + listed ADRs. Dev implements TDD-style, spawning
    checkers as it likes, commits where the contract grants `ship:
-   commit`, writes its handoff, done.
-5. Coordinator launches the gate reviewer(s) (`review-goal.md`, detached
-   worktree of Dev's SHA, second reviewer from `review-alt` when the
-   route says `dual`) → `docs/reviews/M1.G<k>.R<r>.md`.
-6. fail → round rule from §2.4 (resume ×2, then fresh Dev one tier up,
-   then stall → Director). pass → merge gate (three legs) on this lane,
-   GATE block, ship per `ship:`, board row `merged`, panes torn down.
+   commit`, writes its handoff, then runs `orch review G<k>`.
+5. The command spawns the gate reviewer(s) with `ORCH_ROLE=reviewer`
+   (`review-goal.md`, detached worktree of Dev's SHA, second reviewer
+   from `review-alt` when the route says `dual`) →
+   `docs/reviews/M1.G<k>.R<r>.md`. Dev waits for the file.
+6. fail → Dev reads the file and fixes; round rule from §2.4 applies
+   (the Coordinator counts rounds from the files: resume ×2, then fresh
+   Dev one tier up, then stall → Director). pass → Dev's handoff says so
+   and Dev finishes; the Coordinator reads the review, runs the merge
+   gate (three legs) on this lane, writes the GATE block, ships per
+   `ship:`, flips the board row `merged`, tears the panes down.
 7. Coordinator proposes the next goal or, when the milestone's goals are
    all `merged`, writes the milestone summary and blocks for the
    Director.
@@ -358,17 +375,21 @@ them. 7 and 8 came from the operator's r2 review of r1.
    long-horizon objective; everything the Coordinator dispatches is
    goal-sized. The Architect is goal-sized and optional. Lanes rename
    `C<n>` → `G<n>`; `M<n>` is added to the header.
-8. **Review splits into checker and gate (r2).** Dev and Architect spawn
-   in-session checkers freely (advisory). The gate verdict is launched
-   only by the Coordinator, needs no pane, and is the only writer of
-   `docs/reviews/` — enforced by the role hook.
+8. **Review splits into checker and gate (r2, amended r2.1).** Dev and
+   Architect spawn in-session checkers freely (advisory). The gate
+   reviewer is *launched* from their session too, via a fixed
+   `orch review` command they cannot brief; it runs with
+   `ORCH_ROLE=reviewer`, needs no pane, and is the only writer of
+   `docs/reviews/` — enforced by the role hook. Chosen over
+   Coordinator-launched (slower) and Dev-briefed (no independent
+   reader).
 
 Still open (not asked; surfaced by the decisions): whether the `C`→`G`
 lane rename lands before or with the first `M`-headed board; whether
 `R0` for the plan review reads well once goals without an Architect
-start at `R1`; and whether the Coordinator's gate reviewer should be a
-subagent of its own session (cheaper) or an ephemeral pane (visible in
-the fleet footer) — the hand-run in §6 should tell.
+start at `R1`; and whether a reviewer spawned by `orch review` should
+register in the fleet roster (visible in the FLEET footer) or stay a
+plain subagent — the hand-run in §6 should tell.
 
 ## 6. What would prove this is right
 
