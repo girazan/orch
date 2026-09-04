@@ -5,7 +5,7 @@ r2 re-cuts the unit of work (goal = lane, milestone = board header) and
 splits review into an in-session checker and an independent gate, both
 launched from the working session (§2.8, r2.1); r2.2 adds steps for big
 goals with gate review per step (§2.7); r2.3 closes the open questions
-(§5.11–15) and adds recipes (§7). Written against origin/main;
+(§5.11–15) and adds recipes (§7); r2.4 gives milestones a command (§5.16). Written against origin/main;
 local main's `board-gh` work (GitHub Issues as the board) is referenced
 where vocabulary overlaps.
 No review round yet · Baseline: orch v0.7.0 (`6043bb4`) · Companion to
@@ -388,8 +388,9 @@ reviewer prompt skeleton, different rubric file.
    (three legs, once per goal) on this lane, writes the GATE block,
    ships per `ship:`, closes the goal, tears the panes down.
 7. Coordinator proposes the next goal or, when the milestone's goals are
-   all `merged`, writes the milestone summary and blocks for the
-   Director.
+   all `merged`, writes the milestone summary against the Milestone's
+   `done:` line and blocks. The Director closes it with
+   `/orch:milestone close` (§5.16).
 
 The single-orchestrator mode (today's `/orch:go` in one session) stays
 the default. This flow activates behind `workflow.coordinator: "herdr"`,
@@ -451,6 +452,19 @@ them. 7 and 8 came from the operator's r2 review of r1.
 15. **Recipes are in: §7 (r2.3).** Seven one-page recipes selected per
    goal or step at route time; stages map to installed skills; gates
    and hooks are recipe-independent.
+16. **Milestones get a home: `/orch:milestone` (r2.4).** Director-only
+   fifth command; refused in any pane with `ORCH_ROLE` set. A milestone
+   is exactly three fields on the GitHub Milestone — title
+   `M<n> · <objective>`, description `target: <date> · done:
+   <observable>`, due date — and nothing else: no brief, metric, kill
+   line or review (those are goal-level). Verbs: `define` (three-question
+   interview → writes the Milestone; the board-gh `add-milestone` verb
+   underneath), `split` (proposes ordered candidate goals with a rough
+   size, creates nothing; each accepted one is handed to `/orch:goal`),
+   `close` (shows the Coordinator's summary against `done:`, closes the
+   Milestone on acknowledgement — the flow's step 7 finally has an
+   ending). README: "five commands — three act on work, one on scope,
+   one looks."
 
 Nothing surfaced by the decisions is still open. What the hand-run in
 §6 should still measure is listed there.
