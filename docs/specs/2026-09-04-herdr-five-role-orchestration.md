@@ -1,7 +1,7 @@
 # Five-Role Orchestration on Herdr — Design Spec
 
-Date: 2026-09-05 · Status: **r9** — round-6 rework (Codex FAIL 2c/3M on
-r8; Opus round 6 pending; §13) · Baseline: `main` with
+Date: 2026-09-05 · Status: **r10** — review loop stopped after round 6
+(§13); §9 now names the operator's chosen skill per stage (d.17, d.32) · Baseline: `main` with
 the GitHub board (`board-gh`), orch v0.7.0 + unreleased · Companion to
 `2026-08-31-orch-v2-upgrade-design.md`, whose **threat model and label
 vocabulary this spec inherits verbatim**: hooks defend against a sloppy
@@ -12,7 +12,7 @@ state · **ADVISORY** = catches drift, bypassable by intent · **INSTRUCTED**
 r2 dropped: hooks see direct tool calls (`Read`/`Edit`/`Write`, the typed
 `Bash` line); scripts, wrappers and native I/O are out of their sight.
 
-Decisions are numbered 1–31 in §11; earlier revisions' text is superseded
+Decisions are numbered 1–32 in §11; earlier revisions' text is superseded
 by this document wherever they differ. The input artifact is in §A.
 
 ## 1. Target architecture at a glance
@@ -453,40 +453,55 @@ recipe in `skills/go/recipes/<name>.md`; a recipe needing more than a page
 is two recipes or a discipline that belongs downstream. Recipes are never
 commands (d.20).
 
-## 9. Skill routing — one map keyed by stage
+## 9. Skill routing — one chosen skill per stage
 
 ```json
 "workflow": {
   "coordinator": "native | loop | herdr",
   "dispatch":    "confirm | auto",
-  "prefer":      ["superpowers", "mattpocock", "native"],
-  "tools":       { "debug": "mattpocock:diagnosing-bugs" }
+  "tools":       { "<stage>": "<skill name>@<plugin version>" | null, … }
 }
 ```
 
-Resolution: explicit `tools[stage]` → first provider in `prefer` with the
-stage installed → orch's native fallback. The resolved skill is written
-as a worklog ledger line `skill: <stage>=<name>` (plan 2; the ROUTE
-grammar is unchanged, r9 Codex M3) so a session records what ran; a
-missing preferred skill falls back and says so.
+Resolution: `tools[stage]` if set and installed → orch's native fallback,
+and the worklog ledger records which (`skill: <stage>=<name>`; the ROUTE
+grammar is unchanged). A missing or version-mismatched skill falls back
+and says so; `/orch:board` lists such stages. `/orch:setup` fills the map
+(skill discovery via `/find-skills` when installed, native listed first)
+and pins the installed plugin version. Orch ships **only the native
+column**; every other cell is the operator's choice, recorded as data —
+never a code import, never read by a hook.
 
-| stage | role | superpowers | mattpocock | native |
-|---|---|---|---|---|
-| define milestone | Director | brainstorming | grilling | three questions |
-| grill / shape | Architect | brainstorming | grill-with-docs, grilling | three questions |
-| spec | Architect | writing-plans | to-spec | plan section |
-| split to steps | Architect | writing-plans | to-tickets; wayfinder for fog | plan section |
-| domain model | Architect | — | domain-modeling | ADR |
-| tdd | Dev | test-driven-development | tdd | ladder step 1 |
-| debug | Dev | systematic-debugging | diagnosing-bugs | ladder step 1 |
-| research | Architect, Dev | — | research | web search → grade sources |
-| cleanup | Dev | — | — | native de-sloppify prompt |
-| merge conflicts | Dev | — | resolving-merge-conflicts | stop, park |
-| gate rubric | Gate | verification-before-completion (checklist) | code-review (second axis) | `review-goal.md`, **always**, hashed |
-| handoff | every role | — | handoff | four-line handoff |
+**Decided 2026-09-05 (d.32), Pocock-first.** One rule shaped the picks:
+`board-gh` is the only board writer, so every Pocock skill that publishes
+to a tracker (`to-spec`, `to-tickets`, `wayfinder`) runs with
+`/setup-matt-pocock-skills` set to the **local-markdown tracker** under
+`tmp/tickets/` (scratch); the Architect turns those files into
+`add-item` calls. Pointing that tracker at GitHub is a misconfiguration
+`/orch:setup` checks for.
+
+| stage | role | chosen skill | native fallback |
+|---|---|---|---|
+| define milestone | Director | `grilling` | three questions |
+| grill / shape | Architect | `grill-with-docs` (ADRs + glossary → `docs/adr`) | three questions |
+| spec | Architect | `to-spec` (local tracker) | plan section |
+| split to steps | Architect | `to-tickets` (local tracker → `add-item` per ticket) | plan section |
+| fog | Architect | `wayfinder` (local map) | fog list in the plan section |
+| domain model | Architect | `domain-modeling` | ADR |
+| tdd | Dev | `tdd` | ladder step 1 |
+| debug | Dev | `diagnosing-bugs`; `bug-echo` after the fix (find siblings of the same pattern) | ladder step 1 |
+| iterate | Dev | — | hypothesis → change → measure |
+| cleanup | Dev | `safe-refactor` (verification brackets each edit) | de-sloppify prompt |
+| fast | Dev | `implement` (from the step's ticket) | implement → test |
+| research | Architect, Dev | `research` (findings file in the repo) | web search → grade sources |
+| merge conflicts | Dev | — (`resolving-merge-conflicts` only when the owner says go) | stop, park for owner |
+| gate rubric | Gate | `code-review` as the second axis (standards + spec on a fixed range) | `review-goal.md`, **always**, hashed |
+| merge gate proof | Dev | `verify-and-stop` | full-suite verdict line |
+| handoff | every role | `handoff` (brief adds the 40-line cap) | four-line handoff |
 
 Providers shape craft, never safety: no hook reads this map; the gate
-rubric is extended, never replaced; the Coordinator has no row.
+rubric is extended, never replaced; the Coordinator has no row. Superpowers
+stays installed for the operator's own sessions; orch does not route to it.
 
 ## 10. Commands
 
@@ -525,7 +540,7 @@ pending, reports) any Director-only action when the pane is roled.
 14. `S<j>` assigned at creation by `add-item`, stored as a `step:` body line, never renumbered *(r4)*.
 15. Recipes are in (§8).
 16. `/orch:milestone` with three-field milestones; `feature:` on the BRIEF; `accept:`/`recipe:` on steps.
-17. Skill routing keyed by stage (§9).
+17. Skill routing keyed by stage (§9); one chosen skill per stage in `workflow.tools`, native fallback shipped by orch, `prefer` dropped *(r10)*.
 18. Domains are features: Feature options mirror contract domain names; `init` seeds, `setup` syncs; **Pipeline no longer seeded from domains** *(r3).*
 19. Reprioritising: `move` for items and goals; Priority-first lane pick *(r3: one rule, §4).*
 20. No sixth command; recipes are never commands.
@@ -540,6 +555,7 @@ pending, reports) any Director-only action when the pane is roled.
 29. *(r3)* Dispatch confirmation mode `workflow.dispatch: confirm|auto`, default `confirm`, five-line proposal via AskUserQuestion; `auto` logs the same lines.
 30. *(r6)* The evidence lint is git-only: manifests are self-sufficient (`goal:`/`step:`/`item:` lines, content-addressed rubric copies under `docs/reviews/rubrics/`), `base:` lives in the worklog ROUTE line, written at the goal's first dispatch of any pane, and evidence paths carry a built-in ship-gate commit grant for typed commits. *(r7: the lint is the one algorithm in §5 — chain, target, legs, close tail.)*
 31. *(r8)* The review range is goal-scoped: `domains:` and `base:` are read from the worklog as of the commit that introduced the ROUTE line; goal paths = their locked contract paths minus evidence paths; concurrent goals on one branch never enter each other's diffs.
+32. *(r10)* Stage skills chosen Pocock-first (§9 table); tracker-publishing skills run on the local-markdown tracker so `board-gh` stays the only board writer; versions pinned by setup.
 
 ## 12. What would prove this is right
 
@@ -562,6 +578,11 @@ session marker + Stop rule · (4) `orch review` + manifests + evidence lint
 commit grant + `done --goal --step` · (5) coordinator vehicles (loop, then
 herdr) + dispatch confirm.
 1 first; 2 ∥ 3; **4 after 2 and 3**; 5 after 3 + 4.
+
+r10 (no review round): the dual-review loop was stopped after round 6 —
+from round 5 every finding was §5 lint precision; the residue (Codex r6
+minors, Opus r6 unfinished) is an input to plan 4's own review. §9
+rewritten per d.32.
 
 r9 answers Codex round 6: C1 (plan-round header is script-written and
 INSTRUCTED; only step manifests are ENFORCED\*), C2 (leg f verifies
