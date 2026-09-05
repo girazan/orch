@@ -1,7 +1,7 @@
 # Five-Role Orchestration on Herdr — Design Spec
 
-Date: 2026-09-05 · Status: **r8** — round-5 rework, both reviewers (Codex
-FAIL 3c/3M, Opus REWORK 1c/2M on r6; §13) · Baseline: `main` with
+Date: 2026-09-05 · Status: **r9** — round-6 rework (Codex FAIL 2c/3M on
+r8; Opus round 6 pending; §13) · Baseline: `main` with
 the GitHub board (`board-gh`), orch v0.7.0 + unreleased · Companion to
 `2026-08-31-orch-v2-upgrade-design.md`, whose **threat model and label
 vocabulary this spec inherits verbatim**: hooks defend against a sloppy
@@ -149,7 +149,7 @@ env-inheritance finding (§13, Opus A1/A2, Codex 1).
 | launched by | Dev / Architect, in-session, freely | Dev / Architect run `orch review G<k> --step S<j>` (or `--plan`) when they believe the unit is done; the Coordinator runs it to re-check after an inconclusive |
 | brief | the caller's | assembled by the script: rubric file(s) + `git diff <base>..<sha> -- <paths>` + handoff + BRIEF. **This is a convention, not a guarantee** — the caller could run its own subagent. What makes the gate a gate is the next row. |
 | output | advice in the caller's context; ledger line at most | slot file(s) + a **round manifest** with a verifiable header (below) |
-| status | ADVISORY | verdict content ADVISORY (sloppy-agent model); header **ENFORCED\*** by the evidence lint |
+| status | ADVISORY | verdict content ADVISORY (sloppy-agent model); **step** manifest header **ENFORCED\*** by the evidence lint at `done`/`close-goal`; a **plan** manifest (`P.R<r>`) is not in the chain and no verb transitions on it — its header is script-written, its use INSTRUCTED (r9, Codex C1: the Coordinator dispatches the first step only after a passing `P.R<r>`, nothing enforces that) |
 
 **Round manifest** (`docs/reviews/M53.G142.S2.R1.md`, written by the script
 after every slot has finished or failed to spawn, then committed):
@@ -195,9 +195,12 @@ reviews the plan section, not a diff.
   not make a manifest a domain file; Opus S6).
 - **Frozen BRIEF (r8, Opus S1/S3):** the goal's `domains:` and the ROUTE
   `base:` are read from the worklog **as of the commit that introduced its
-  ROUTE line** — `git log --reverse --format=%H -S'ROUTE: lane:G<n>' --
-  tmp/worklogs/G<n>-*.md | head -1`, then `git show <that>:<file>` — never
-  from HEAD. A later rewrite of either line changes nothing the lint
+  ROUTE line** — `git log --reverse --format=%H --name-only -S'ROUTE:
+  lane:G<n> ' -- 'tmp/worklogs/'` gives the first such commit **and the
+  path it touched**; the lint reads `git show <commit>:<that path>`, so a
+  later rename or a second worklog changes nothing; zero or more than one
+  path in that first commit → MISS "frozen BRIEF ambiguous" (r9, Codex
+  M1) — never from HEAD. A later rewrite of either line changes nothing the lint
   reads, so the evidence-path commit grant cannot shrink a range.
 - **Goal paths** = the union of the locked contract paths of the frozen
   `domains:`, minus the evidence paths. The reviewer is handed
@@ -252,6 +255,10 @@ LEGS on TARGET (and, for close-goal, on every chain member):
      file exists with the same range:/paths:;  verdict: == aggregate of
      the slot files' verdict: lines (missing/absent slot → inconclusive)
  (e) aggregate == pass
+ (f) every slot line's <model> equals locked models.review (slot 1) or
+     models.review-alt (slot 2) and its <tier> ranks ≥ locked tiers.review
+     of every frozen domain, never below `high` (Codex C2: the header
+     fields are verified, not decorative)
 CLOSE TAIL (close-goal only, Codex C3): `git diff <last head>..HEAD
      --name-only`, evidence paths removed, must contain no file matching
      GOALPATHS (only evidence and other goals' domains may follow — the
@@ -284,8 +291,9 @@ Rules, all INSTRUCTED unless noted:
   attention the Coordinator re-runs the gate as the next round. The
   filename advances, the fix-round count does not.
 - **Dual review** is a contract property, not a route choice (r5): a
-  domain with `review: "dual"` in the locked contract gets two slots
-  whenever its paths are in the diff. The script computes it the same way
+  goal with any frozen domain marked `review: "dual"` in the locked
+  contract gets two slots on every step round (r9: the goal's domains
+  decide, not the diff — the same rule the lint's leg d applies). The script computes it the same way
   the lint does; the ROUTE line only records it. No `review-alt`
   configured → the script refuses before spawning anything.
 - **Rubric selection is not caller text.** `recipe:` on a step is written
@@ -458,7 +466,8 @@ commands (d.20).
 
 Resolution: explicit `tools[stage]` → first provider in `prefer` with the
 stage installed → orch's native fallback. The resolved skill is written
-into the ROUTE line (`skill:<name>`) so a session records what ran; a
+as a worklog ledger line `skill: <stage>=<name>` (plan 2; the ROUTE
+grammar is unchanged, r9 Codex M3) so a session records what ran; a
 missing preferred skill falls back and says so.
 
 | stage | role | superpowers | mattpocock | native |
@@ -553,6 +562,13 @@ session marker + Stop rule · (4) `orch review` + manifests + evidence lint
 commit grant + `done --goal --step` · (5) coordinator vehicles (loop, then
 herdr) + dispatch confirm.
 1 first; 2 ∥ 3; **4 after 2 and 3**; 5 after 3 + 4.
+
+r9 answers Codex round 6: C1 (plan-round header is script-written and
+INSTRUCTED; only step manifests are ENFORCED\*), C2 (leg f verifies
+model/tier against the lock), M1 (frozen lookup yields commit + path;
+ambiguity is a miss), M2 (dual decided by frozen domains, prose = lint),
+M3 (`skill:` is a ledger line, not a ROUTE field). Plan findings → plan
+r7.
 
 r8 answers Opus round 5: S1 (goal-scoped range from the frozen BRIEF;
 rule 5's rationale now true), S2 (dirty check on goal paths before the
