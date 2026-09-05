@@ -5,7 +5,7 @@ r2 re-cuts the unit of work (goal = lane, milestone = board header) and
 splits review into an in-session checker and an independent gate, both
 launched from the working session (§2.8, r2.1); r2.2 adds steps for big
 goals with gate review per step (§2.7); r2.3 closes the open questions
-(§5.11–15) and adds recipes (§7); r2.4 gives milestones a command (§5.16); r2.5 records the project hierarchy (§8); r2.6 the skill routing map (§9); r2.7 domains = features, prioritise verb, no sixth command (§5.18–20); r2.8 loop vehicle, pulse line, no-progress rule, fresh Dev per step (§5.21–24). Written against origin/main;
+(§5.11–15) and adds recipes (§7); r2.4 gives milestones a command (§5.16); r2.5 records the project hierarchy (§8); r2.6 the skill routing map (§9); r2.7 domains = features, prioritise verb, no sixth command (§5.18–20); r2.8 loop vehicle, pulse line, no-progress rule, fresh Dev per step (§5.21–24); r2.9 concurrent milestones, singular Coordinator (§5.25). Written against origin/main;
 local main's `board-gh` work (GitHub Issues as the board) is referenced
 where vocabulary overlaps.
 No review round yet · Baseline: orch v0.7.0 (`6043bb4`) · Companion to
@@ -209,9 +209,9 @@ one `goal:`, one `done:`, one `kill:` — and the board header line
 (`ORCH BOARD · orch · make orch learn from what ships…`) is already the
 long-horizon objective. So:
 
-- **Milestone = board header**, `M<n> · <objective>`. Owned by the
-  Director: scope and priority are theirs by contract. One active
-  milestone per board; a milestone changes when the header changes.
+- **Milestone = GitHub Milestone**, `M<n> · <objective>`. Owned by the
+  Director: scope and priority are theirs by contract. Any number may
+  be open at once (§5.25); goals attach to exactly one.
 - **Goal = lane**, what `/orch:goal` creates today. The BRIEF is the
   goal section; `done:` is its acceptance criterion; the worklog is its
   plan and ledger. No `## Goals` sub-structure, no third file.
@@ -564,6 +564,17 @@ them. 7 and 8 came from the operator's r2 review of r1.
    still allows carrying a pane over when its context is an asset.
    Cost stated plainly: parallel loops trade the Director's flow for
    steady stress — the touchpoint list in §4 is the mitigation.
+25. **Milestones run concurrently; the Coordinator stays singular (r2.9).**
+   Any number of open milestones, each with goals in flight. Lane pick
+   across milestones: goal Priority wins (`Now` under M2 beats `Next`
+   under M1); within a bucket, lower milestone number, then lower issue
+   number — so `/orch:milestone prioritize` covers both cases with no
+   new verb. One Coordinator per repo, one lane advanced per tick; up
+   to the fleet ceiling of Dev panes live at once, one per goal. Never
+   two Coordinators on one repo, never two Dev panes on one goal. True
+   parallel driving splits the repo, not the Coordinator. The name stays
+   *milestone*: "campaign" was already retired twice and GitHub's object
+   is a Milestone.
 
 Nothing surfaced by the decisions is still open. What the hand-run in
 §6 should still measure is listed there.
