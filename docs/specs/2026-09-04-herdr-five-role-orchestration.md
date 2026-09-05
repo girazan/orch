@@ -1,6 +1,6 @@
 # Five-Role Orchestration on Herdr — Design Spec
 
-Date: 2026-09-05 · Status: **r10** — review loop stopped after round 6
+Date: 2026-09-06 · Status: **r11** — branch and PR per goal (d.33); r10: review loop stopped after round 6
 (§13); §9 now names the operator's chosen skill per stage (d.17, d.32) · Baseline: `main` with
 the GitHub board (`board-gh`), orch v0.7.0 + unreleased · Companion to
 `2026-08-31-orch-v2-upgrade-design.md`, whose **threat model and label
@@ -12,7 +12,7 @@ state · **ADVISORY** = catches drift, bypassable by intent · **INSTRUCTED**
 r2 dropped: hooks see direct tool calls (`Read`/`Edit`/`Write`, the typed
 `Bash` line); scripts, wrappers and native I/O are out of their sight.
 
-Decisions are numbered 1–32 in §11; earlier revisions' text is superseded
+Decisions are numbered 1–33 in §11; earlier revisions' text is superseded
 by this document wherever they differ. The input artifact is in §A.
 
 ## 1. Target architecture at a glance
@@ -372,9 +372,11 @@ it, exactly as for the ship gate).
    check (`kill:` line); capacity check (fleet ceiling); pulse. **On the
    goal's first pick** — before any pane, Architect or Dev — the route
    phase writes the ROUTE line (`base:` = HEAD now, `review:` from the
-   contract, tier/decide/ship from the contract) and commits the worklog
-   (evidence path). Every later manifest of the goal, plan rounds
-   included, chains from this `base:` (r7).
+   contract, tier/decide/ship from the contract), **creates the goal
+   branch `goal/G<k>-<name>` at that `base:`** (d.33) and commits the
+   worklog on it (evidence path). Every later manifest of the goal, plan
+   rounds included, chains from this `base:` (r7); every pane of the goal
+   works on this branch.
 3. **Shape, only if fuzzy or big**: Architect pane. Research route if a
    knowledge gap; ≤5 questions (pane blocks; answers → accepted ADRs);
    plan section = `steps` (each `accept:` + an *execution* `recipe:`, §8)
@@ -410,10 +412,16 @@ it, exactly as for the ship gate).
    beats its noise band ③ root cause, no band-aid → GATE block in the
    worklog (`subject:<last passing manifest's head-sha> · regression ·
    metric · rootcause`), committed with the board/worklog as the evidence
-   commit → ship per the contract's grant (`none` → hand the Director the
-   command) → `close-goal G<k> --evidence` (ledger check today; the §5
-   lint after plan 4; **refused when the goal has no step** — every goal
-   has `S1`) → pane torn down, roster cleared.
+   commit → push the goal branch per the contract's grant (`push`; a
+   `commit`-only or `none` domain → hand the Director the push) → the
+   Coordinator opens **one PR per goal** (title `G<k> · <name>`, body =
+   BRIEF + links to every passing manifest; `gh pr create` is a typed
+   command the ship gate sees) → **the Director merges** (owner-typed
+   OWNER-APPROVED, as today; agents never merge) → `close-goal G<k>
+   --evidence` after the merge (ledger check today; the §5 lint after
+   plan 4; **refused when the goal has no step** — every goal has `S1`)
+   → branch deleted, pane torn down, roster cleared. Steps are commits on
+   the goal branch, never PRs of their own.
 8. **Milestone**: when every goal under `M<n>` is merged the Coordinator
    writes a one-line summary against the milestone's `done:` into
    `tmp/handoffs/M<n>-coordinator.md`; `/orch:milestone close` shows it,
@@ -556,6 +564,7 @@ pending, reports) any Director-only action when the pane is roled.
 30. *(r6)* The evidence lint is git-only: manifests are self-sufficient (`goal:`/`step:`/`item:` lines, content-addressed rubric copies under `docs/reviews/rubrics/`), `base:` lives in the worklog ROUTE line, written at the goal's first dispatch of any pane, and evidence paths carry a built-in ship-gate commit grant for typed commits. *(r7: the lint is the one algorithm in §5 — chain, target, legs, close tail.)*
 31. *(r8)* The review range is goal-scoped: `domains:` and `base:` are read from the worklog as of the commit that introduced the ROUTE line; goal paths = their locked contract paths minus evidence paths; concurrent goals on one branch never enter each other's diffs.
 32. *(r10)* Stage skills chosen Pocock-first (§9 table); tracker-publishing skills run on the local-markdown tracker so `board-gh` stays the only board writer; versions pinned by setup.
+33. *(r11)* One branch and one PR per goal: branch `goal/G<k>-<name>` from the ROUTE `base:` at first pick; steps are commits on it; the Coordinator opens the PR after the merge gate; the Director merges; `close-goal` follows the merge. Rule 5 of §4 becomes a safety net for goals that still share a branch rather than the load-bearing isolation.
 
 ## 12. What would prove this is right
 
@@ -578,6 +587,8 @@ session marker + Stop rule · (4) `orch review` + manifests + evidence lint
 commit grant + `done --goal --step` · (5) coordinator vehicles (loop, then
 herdr) + dispatch confirm.
 1 first; 2 ∥ 3; **4 after 2 and 3**; 5 after 3 + 4.
+
+r11 (no review round): d.33, branch and PR per goal (§7 steps 2 and 7).
 
 r10 (no review round): the dual-review loop was stopped after round 6 —
 from round 5 every finding was §5 lint precision; the residue (Codex r6
