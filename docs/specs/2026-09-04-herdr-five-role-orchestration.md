@@ -484,7 +484,7 @@ never a code import, never read by a hook.
 `board-gh` is the only board writer, so every Pocock skill that publishes
 to a tracker (`to-spec`, `to-tickets`, `wayfinder`) runs with
 `/setup-matt-pocock-skills` set to the **local-markdown tracker** under
-`tmp/tickets/` (scratch); the Architect turns those files into
+`.scratch/<feature>/` (gitignored; `docs/agents/issue-tracker.md`); the Architect turns those files into
 `add-item` calls. Pointing that tracker at GitHub is a misconfiguration
 `/orch:setup` checks for.
 
