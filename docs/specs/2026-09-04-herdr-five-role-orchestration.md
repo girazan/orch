@@ -1,7 +1,7 @@
 # Five-Role Orchestration on Herdr — Design Spec
 
-Date: 2026-09-05 · Status: **r4** — round-2 rework (Opus REWORK 3c/5M,
-Codex FAIL 2c/7M on r3; §13) · Baseline: `main` with
+Date: 2026-09-05 · Status: **r5** — round-3 rework (Opus REWORK 2c/7M,
+Codex FAIL 5c/3M on r4; §13) · Baseline: `main` with
 the GitHub board (`board-gh`), orch v0.7.0 + unreleased · Companion to
 `2026-08-31-orch-v2-upgrade-design.md`, whose **threat model and label
 vocabulary this spec inherits verbatim**: hooks defend against a sloppy
@@ -27,11 +27,11 @@ by this document wherever they differ. The input artifact is in §A.
      │ starts panes with ORCH_ROLE=…  (a guardrail, not a credential — §6)
      ├─► ARCHITECT   goal-sized, only if fuzzy/big · plan: steps + fog · recipe per step · ADRs · ≤5 Qs
      ├─► DEV         fresh pane per step · execution recipe → skills · checkers (a capability) · commits per contract
-     └─► GATE        spawned by `orch review` · verdict file whose header the evidence lint recomputes (§5)
+     └─► GATE        spawned by `orch review` · round manifest whose header the evidence lint recomputes (§5)
 
  UNITS   M53 milestone (GitHub Milestone #53)  ─ G3 goal (issue #3)  ─ S2 step (sub-issue, `step:` line)  ─ R1 round
  STATE   GitHub board · worklog · docs/adr · tmp/handoffs (scratch) · docs/reviews (evidence) · audit log
- GATES   contract ship rank ★ · review evidence lint ★ · destructive git ★ · role guardrails (advisory)
+ GATES   contract ship rank ★ · destructive git ★ · review evidence lint (★ once plan 4 moves it into the hook) · role guardrails (advisory)
 ```
 
 **Stated risk (from the operator's Codex verdict):** over-orchestration —
@@ -50,7 +50,7 @@ capability not a role, dispatch confirmation is a mode that turns off, and
 | **step** | the unit Dev builds and the gate judges; **every goal has at least one** (a small goal has exactly one, its `gate:` item) | sub-issue of the goal; body `text · step: S<j> · outcome: · gate: · accept: · recipe:`; label `orch:item` | `S<j>` — stored in the body |
 | **review round** | one gate verdict on a step (or the plan) | manifest `docs/reviews/M<n>.G<k>.S<j>.R<r>.md` (+ slot files `…R<r>-1.md`, `…R<r>-2.md` under dual review); plan review `M<n>.G<k>.P.R<r>.md` | `R<r>` |
 | **domain** | a territory of expertise in the contract (paths · expertise · decide · ship · tiers); **also the workstream** | Project **Feature** option, mirrored from the contract | never |
-| **lane** | *retired.* Where the token survives in pinned grammar (`ROUTE: lane:G<n>`, `focus: G<n>`) it means "the goal" | — | — |
+| **lane** | *retired as a word.* It survives as a data key and a grammar token (`ROUTE: lane:G<n>`; the `lane` key in `board-gh read` JSON) meaning "the goal" | — | — |
 | **checker** | a capability of Dev or Architect: an in-session subagent asked for fast feedback; advisory | — | — |
 
 Id rules (r4 — **one number per level**): `M<n>` and `G<n>` are GitHub
@@ -79,7 +79,7 @@ Examples: `M53.G142.S1.R2` (small goal = its one step, second round) ·
 | Coordinator | one per repo; `native` (today's session) · `loop` (`/loop <interval> /orch:go`) · `herdr` pane | frontier first; `mid` once one milestone ran clean (d.1) | pick one goal per tick, dispatch, gate bookkeeping, board status, pulse | read code (ADVISORY: direct `Read` outside its allowlist refused; `Bash` reads are not seen); design, implement, produce a verdict (INSTRUCTED) |
 | Architect | pane per goal, `ORCH_ROLE=architect`, only when the goal is fuzzy or big | frontier | research, plan section (steps + fog), `recipe:` per step, ADRs, ≤5 questions | write dev-domain paths (ADVISORY, direct `Edit`/`Write` only) |
 | Dev | **fresh pane per step** (d.24), `ORCH_ROLE=dev`; resident across fix rounds 1–2 | `tiers.work` floor ∨ the route's tier, strictest wins | one step (or one small goal), its tests, its handoff, commits where `ship: commit` | change the BRIEF or the plan (INSTRUCTED; the BRIEF is an issue body only `board-gh` verbs mutate); write `docs/reviews/` (ADVISORY path rule + ENFORCED\* evidence lint, §5) |
-| Gate reviewer | subagent spawned by `orch review` **with an explicit child env** `ORCH_ROLE=reviewer` (a spawner sets its child's env; inheritance is the default, not a constraint — and still forgeable, hence ADVISORY); no pane; roster entry while it runs | `tiers.review`, never below `high`; second slot from `models.review-alt` — **dual requested with no `review-alt` configured → the script refuses**, it never silently runs single | the slot file(s) and the round manifest | fix what it finds, ship anything (ADVISORY path rules; the ship gate refuses commit/push for the role — also ADVISORY, since it keys on the role) |
+| Gate reviewer | subagent spawned by `orch review` **with an explicit child env** `ORCH_ROLE=reviewer` (a spawner sets its child's env; inheritance is the default, not a constraint — and still forgeable, hence ADVISORY); no pane; roster entry while it runs | `tiers.review`, never below `high`; second slot from `models.review-alt` — **dual requested with no `review-alt` configured → the script refuses**, it never silently runs single | the slot file(s) and the round manifest (the script commits them — an evidence-only commit under `docs/reviews/`, which the ship gate treats as an evidence path like the worklog and ADRs) | fix what it finds, ship code (ADVISORY path rules; the ship gate refuses commit/push for the role — also ADVISORY, since it keys on the role) |
 
 Context budget: Coordinator reads the board (via `board-gh read`), the
 latest handoff, the latest review, and the **focus goal's worklog** (r3:
@@ -95,13 +95,13 @@ reviewer reads the BRIEF, the diff range, the handoff, test output.
 | contract, models, `workflow.{coordinator,prefer,tools,dispatch}` | `.claude/orch.json`, mirrored to `~/.claude/orch-lock.json` | Director via `/orch:setup` | hooks, every skill | lock replaces `{contract, models}` wholesale (v2) |
 | board | **GitHub only**: Milestone → goal issue → step sub-issues; Project fields Status · Priority · Feature · Pipeline | `board-gh` verbs only | `board-gh read` | `docs/BOARD.md` is gone (main CHANGELOG); r2 references to it are void |
 | milestone | GitHub Milestone, three fields (§2) | `add-milestone` (Director-only): create, then retitle to `M<github number> · <objective>` — two journaled sub-effects, idempotent on the exact `M<n> · <objective>` title (legacy `C…` titles never match) | `milestones`, `/orch:goal` step 1 | **M/C compatibility:** `milestoneRank` accepts `^[MC](\d+)` for sorting only; ids always use the GitHub number; existing `C<n>` milestones are never renamed by orch |
-| goal BRIEF | goal issue body: `goal · metric · done · domains · feature · kill` | `add-goal --brief` | everyone | `feature:` = primary domain; `add-goal` **parses it from the brief file** and sets the Project Feature from it. The route phase records the goal's **base SHA** in the ROUTE line (`base:<sha>` = HEAD at route time); it is the first review range's start |
+| goal BRIEF | goal issue body: `goal · metric · done · domains · feature · kill` + a line `base: <sha>` appended by `add-goal` (HEAD of the repo at creation) | `add-goal --brief` | everyone | `feature:` = primary domain; `add-goal` **parses it from the brief file** and sets the Project Feature from it. `base:` is **GitHub state written once at creation** — the first review range's start; no scratch line is trusted for it (r5) |
 | Feature options | Project field | `init` (non-adopt) seeds from domain names when absent; **adopt mode (`--project`) never creates a Feature field** — it prints a hint and records `feature: null`; `sync-features` (a journaled `board-gh` verb, run by `/orch:setup` after any domain edit and available from `/orch:board`) adds missing options, never deletes; a rename shows up as an added option and a domain-less old option, which `sync-features` lists for the operator | `add-goal`, `add-item` | **Pipeline policy (r3):** `init` no longer seeds Pipeline from domains — absent → created with `general` (main's adopt path keeps creating a missing Priority/Pipeline as today; only Feature is adopt-safe); present → read verbatim, pass-through |
-| step | sub-issue body + fields | `add-item` by Architect (or the goal skill, which **always creates at least the `gate:` step** so a small goal has `S1`); never by Dev | Dev, gate | `add-item` assigns `step: S<j>`; `recipe:` is fixed at plan time and covered by the plan review; Dev cannot alter it (§5) |
-| item Status | Project single-select `Todo · In progress · In review · Done` | Coordinator: `set-status` at dispatch (`In progress`); `orch review` sets `In review` on launch; on the manifest verdict the Coordinator runs: pass → `done <item>` · fail → `set-status <item> "In progress"` · inconclusive → `attention G<n> "inconclusive: <manifest>"` (item stays `In review`); when the Director clears attention the Coordinator **re-runs the gate as `R<r+1>`** (no Dev dispatch) — that is the exit from `In review` | `fold.js` | goal status is derived by `fold.js` from goal state, goal/item labels (incl. the `blocked:` comment lookup), and item Status; reviews never fold directly. **Every goal has ≥1 step, so `running`/`review` are always reachable.** Fold precedence is `fold.js`'s: closed → blocked → needs_attention → review → running → ready, so an inconclusive on a goal with a blocked item shows `blocked` until unblocked |
-| worklog | `tmp/worklogs/G<n>-<name>.md`: BRIEF copy · plan section (steps, fog) · ledger · ROUTE line (with `base:<sha>`) · GATE block | Architect (plan), Dev (ledger), Coordinator (ROUTE, GATE) | Dev, gate, Coordinator (focus goal only) | scratch, not git |
-| handoff | `tmp/handoffs/M<n>.G<k>[.S<j>]-<role>.md`, ≤40 lines | every role at exit | the next role, Coordinator | scratch; **one filename grammar** (r2's §3.2 variant is void) |
-| review | manifest `docs/reviews/M<n>.G<k>.S<j>.R<r>.md` + slot files | slot files by the reviewer(s); the manifest by `orch review` after all slots finish | Dev (on fail), Coordinator, evidence lint | git-tracked evidence; grammar in §5. **Milestone summary** for close: `tmp/handoffs/M<n>-coordinator.md` (a handoff, scratch), not a goal-less board item |
+| step | sub-issue body + fields | `add-item` by Architect (or the goal skill, which **always creates at least the `gate:` step** so a small goal has `S1`, and writes `--recipe` on it from the shaping table); never by Dev | Dev, gate | `add-item` assigns `step: S<j>` from **all** of the goal's sub-issues (REST, paged — not the 40-item read window); `recipe:` is fixed at creation (Architect at plan time, or the goal skill for a small goal) and covered by the plan review where one exists; Dev cannot alter it (§5) |
+| item Status | Project single-select `Todo · In progress · In review · Done` | `board-gh` verbs only: Coordinator `set-status` at dispatch (`In progress`); `orch review` calls `board-gh set-status <item> "In review"` on launch; on the manifest verdict the Coordinator runs: pass → `done <item>` · fail → `set-status <item> "In progress"` · inconclusive → `attention G<n> "inconclusive: <manifest>"` (item stays `In review`); when the Director clears attention the Coordinator **re-runs the gate as `R<r+1>`** (no Dev dispatch) — that is the exit from `In review` | `fold.js` | goal status is derived by `fold.js` from goal state, goal/item labels (incl. the `blocked:` comment lookup), and item Status; reviews never fold directly. **Every goal has ≥1 step, so `running`/`review` are always reachable.** Fold precedence is `fold.js`'s: closed → blocked → needs_attention → review → running → ready, so an inconclusive on a goal with a blocked item shows `blocked` until unblocked |
+| worklog | `tmp/worklogs/G<n>-<name>.md`: BRIEF copy · plan section (steps, fog) · ledger · ROUTE line · GATE block | Architect (plan), Dev (ledger), Coordinator (ROUTE, GATE) | Dev, gate, Coordinator (focus goal only) | **git-tracked, as on main** (r5 — the ship gate reads the ledger and GATE block from HEAD; r4's "scratch" was wrong) |
+| handoff | `tmp/handoffs/M<n>.G<k>[.S<j>]-<role>.md` (`.S<j>` for Dev; none for the Architect) and `tmp/handoffs/M<n>-coordinator.md`, ≤40 lines | every role at exit | the next role, Coordinator | scratch (gitignored); the only scratch files in the design |
+| review | manifest `docs/reviews/M<n>.G<k>.S<j>.R<r>.md` (or `…P.R<r>.md`) + slot files | slot files by the reviewer(s); the manifest by `orch review` after all slots finish, **then committed by the script** (evidence-only commit) | Dev (on fail), Coordinator, evidence lint | git-tracked evidence; grammar in §5. **Milestone summary** for close: `tmp/handoffs/M<n>-coordinator.md` |
 | session marker | `<git-common-dir>/orch/session-<sessionId>.json` `{role, milestone, goal, step, startedAt}` | whoever starts the pane (Coordinator's launcher, or the go skill at session start) | Stop hook, role guardrails | gives Stop the ids and start time it needs to name the handoff file |
 | audit | `.claude/orch-audit.jsonl` | hooks, skills, Coordinator (`by:"pulse"`) | `/orch:board` | stale flag = age of last pulse |
 | fleet roster | `<git-common-dir>/orch/fleet.json` (v2 §3.1) | pane launchers; `orch review` adds/removes its reviewer entry itself (a subprocess with no lifecycle hook — ADVISORY) | `/orch:board` FLEET footer | |
@@ -112,7 +112,11 @@ and the go skill's recency rule):**
 1. the goal the operator named (`/orch:go G8`);
 2. else goals whose status is `running` or `review` (finish in-flight work);
 3. else by Priority bucket across milestones (`Now` under M60 beats `Next` under M53);
-4. within a bucket, lower milestone number, then lower issue number.
+4. within a bucket, lower milestone number, then lower issue number;
+5. (r5) **at most one `running` goal per contract domain at a time** — a
+   goal whose `feature:` domain already has a running goal is skipped this
+   tick. Review ranges are scoped to the goal's domain paths (§5), so this
+   is what keeps two goals' commits out of each other's diffs.
 "Most recently touched worklog" is retired as a rule.
 
 **Only `board-gh` closes goals (r4).** A goal issue closed through the
@@ -136,67 +140,91 @@ env-inheritance finding (§13, Opus A1/A2, Codex 1).
 | status | ADVISORY | verdict content ADVISORY (sloppy-agent model); header **ENFORCED\*** by the evidence lint |
 
 **Round manifest** (`docs/reviews/M53.G142.S2.R1.md`, written by the script
-after every slot has finished or failed to spawn):
+after every slot has finished or failed to spawn, then committed):
 
 ```
 review: M53.G142.S2.R1
-rubric: review-goal.md@<sha256 of skills/go/review-goal.md at HEAD> [+ recipes/tdd.md@<sha256>]
-range: <base-sha>..<head-sha>          # the exact diff every slot was handed
-slots: 1 | 2                            # 2 = dual was required by the ROUTE line
+rubric: review-goal.md@<sha256> [+ recipes/tdd.md@<sha256>]   # hashes of the files at <head-sha>
+range: <base-sha>..<head-sha>          # the diff every slot was handed, restricted to paths:
+paths: src/Hmi.Web/** src/Hmi.Core/**  # the contract paths of the goal's domains at <head-sha>
+slots: 1 | 2                            # 2 = dual, recomputed from the contract (below)
 slot-1: R1-1.md · <model> · <tier> · pass|fail|inconclusive|missing
 slot-2: R1-2.md · <model> · <tier> · pass|fail|inconclusive|missing   # dual only
-verdict: pass | fail | inconclusive     # aggregate: all pass → pass; any fail → fail; else inconclusive (a missing slot is inconclusive)
+verdict: pass | fail | inconclusive     # all pass → pass; any fail → fail; else inconclusive (missing counts as inconclusive)
 ```
 
-Each slot file carries the same `review:`/`rubric:`/`range:` lines plus
-`reasons:` (each citing `done:` or the step's `accept:`) and `notes:`.
+Each slot file carries the same `review:`/`rubric:`/`range:`/`paths:`
+lines plus `reasons:` (each citing `done:` or the step's `accept:`) and
+`notes:`. A plan-round manifest (`…P.R<r>.md`) has `range: <base>..<base>`
+and no `paths:`; it reviews the plan section, not a diff.
 
-**Range rule (r4, computable):** `<base-sha>` is the `head-sha` of the
-**previous passing manifest for this goal**, or the goal's `base:<sha>`
-from the ROUTE line when there is none. `<head-sha>` is HEAD of the
-working tree when the script runs. No notion of "the goal's branch" is
-needed: contiguity of ranges across passes is what the lint checks.
+**Range rule (r5, computable end to end):**
+- `<base-sha>` = the `head-sha` of the previous **passing step manifest of
+  this goal** (plan manifests are not in the chain), else the goal's
+  `base:` line in its issue body (written by `add-goal`, GitHub state).
+- `<head-sha>` = HEAD when the script runs. The reviewer is handed `git
+  diff <base>..<head> -- <paths>`, where `paths` are the contract paths of
+  the goal's `domains:` — so another goal's commits in another domain do
+  not enter this review, and rule 5 of the goal pick keeps two goals out
+  of one domain at once.
+- Because the script commits each manifest, the next step's range begins
+  after that evidence commit; the lint tolerates it because contiguity is
+  checked by SHA equality, not by "no commits in between".
+- Inconclusive → next round `R<r+1>` on the same base (the previous
+  *passing* manifest did not change).
 
-**Evidence lint (the only enforced review claim):** at `done <item>` and
-`close-goal G<n>` the `board-gh` verb recomputes from repo state:
-(a) every rubric hash in the manifest equals the corresponding file at
-HEAD; (b) `head-sha` is an ancestor of HEAD, `base-sha` is an ancestor of
-`head-sha`; (c) `base-sha` equals the previous passing manifest's
-`head-sha` for this goal (or the ROUTE `base:` for the first), and for
-`close-goal` the last manifest's `head-sha` equals the goal's final
-commit; (d) `slots:` matches the ROUTE line's `review: single|dual` and
-every listed slot file exists with matching `range:`; (e) `verdict:
-pass`. Any miss blocks the transition and names the leg. Labels:
-`close-goal` is **ENFORCED\*** today (`contract-ship-gate.js` already
-matches `board-gh close-goal`); `done <item>` is script-checked and
-becomes ENFORCED\* when plan 4 adds the matcher. A forged manifest that
-satisfies all five legs is a *correct* manifest of the right diff; the
-reviewer's judgment stays ADVISORY, as the v2 GATE block's legs are.
+**Evidence lint** — the legs, all recomputable from repo state at the
+verb's HEAD: (a) every rubric hash equals the file **at `<head-sha>`**
+(`git show <head-sha>:<path>`), so later rubric edits never invalidate
+old manifests; (b) `<head-sha>` is an ancestor of HEAD and `<base-sha>`
+an ancestor of `<head-sha>`; (c) `<base-sha>` equals the previous passing
+step manifest's `head-sha` for this goal, or the goal's `base:` for the
+first; for `close-goal`, the last passing manifest's `<head-sha>` equals
+the GATE block's `subject:` **and `git diff <head-sha>..HEAD -- <paths>`
+is empty** (only evidence and other domains may follow — the v2
+two-commit protocol, and it holds under `ship: none` and on a shared
+HEAD); (d) `slots:` equals what the contract requires — `2` iff any
+domain whose paths intersect the diff has `review: "dual"` in the locked
+contract (a new optional domain field beside `tiers`), else `1` — and
+every slot not marked `missing` exists with a matching `range:`; (e)
+`verdict: pass`. Any miss blocks the transition and names the leg.
+
+**Where it runs and what that makes it (r5):** plan 4 puts these legs
+into `hooks/contract-ship-gate.js` beside the existing `close-goal`
+matcher (`:146`) and adds a `board-gh done` matcher. From then on both
+transitions are **ENFORCED\***. Until plan 4 ships, today's hook checks
+only the ledger line at HEAD, and no manifest exists — nothing in this
+section is enforced yet, and no revision of this spec claims otherwise.
+A forged manifest that satisfies all five legs is a *correct* manifest
+of the right diff; the reviewer's judgment stays ADVISORY, as the v2
+GATE block's legs are.
 
 Rules, all INSTRUCTED unless noted:
 - **Verdict is tri-state.** `inconclusive` goes to the Director via
   `attention` (§4), never auto-retried by Dev; after the Director clears
   attention the Coordinator re-runs the gate as the next round. The
   filename advances, the fix-round count does not.
-- **Dual review** (`review: dual` in the ROUTE line, from `tiers.review`
-  and the route's consequence class): the script spawns two reviewers,
-  the second from `models.review-alt`, writing slot files, then the
-  manifest with the aggregate. No `review-alt` configured → the script
-  refuses before spawning anything.
+- **Dual review** is a contract property, not a route choice (r5): a
+  domain with `review: "dual"` in the locked contract gets two slots
+  whenever its paths are in the diff. The script computes it the same way
+  the lint does; the ROUTE line only records it. No `review-alt`
+  configured → the script refuses before spawning anything.
 - **Rubric selection is not caller text.** `recipe:` on a step is written
-  by the Architect at plan time and reviewed under the plan round; Dev
-  never runs `add-item`. For small goals the route phase writes it. The
-  rubric hashes in the manifest pin which rubrics were used.
+  at creation — by the Architect at plan time (reviewed under the plan
+  round) or by the goal skill for a small goal's single step — and Dev
+  never runs `add-item`. The rubric hashes in the manifest pin which
+  rubrics were used.
 - **Tests run on a detached worktree** created by the script under
   `<git-common-dir>/orch/wt/<review-id>/` and removed on exit. `git
   worktree add --detach <that path> <sha>` and `git worktree remove`
   are added to the ship gate's read/local allowlist **only for that path
   prefix** (plan 4); everything else about worktrees stays refused.
-- **Fix rounds** (Coordinator counts from files): rounds 1–2 resume the
-  same Dev pane with the review file **plus the failing test output and
-  any conflict context** (Ralphinho: never a bare retry); round 3 = fresh
-  Dev one tier up; a finding that survives two rounds, or the same
-  error/empty diff twice (d.23) → stall → Director.
+- **Fix rounds** (Coordinator counts **`fail` manifests** for the step,
+  not `R` numbers): fails 1–2 resume the same Dev pane with the manifest
+  **plus the failing test output and any conflict context** (Ralphinho:
+  never a bare retry); fail 3 = fresh Dev one tier up; a finding that
+  survives two fails, or the same error/empty diff twice (d.23) → stall
+  → Director. Inconclusive rounds do not count.
 - The reviewer's roster entry is written and removed by `orch review`
   itself (ADVISORY; a crashed script leaves a ghost the roster's stale
   rule prunes).
@@ -216,17 +244,19 @@ calls. Every row below is **ADVISORY** except the last two.
 | coordinator reads no code | `Read` refused outside: `tmp/handoffs/`, `docs/reviews/`, `.claude/orch.json`, the focus goal's worklog (from the session marker) | ADVISORY (Bash reads unseen) |
 | architect writes no production code | `Edit\|Write` refused on paths matching any contract domain's `paths` when `ORCH_ROLE=architect`; `docs/adr/`, worklog allowed | ADVISORY |
 | dev changes no scope | `Edit\|Write` refused on the worklog's BRIEF block (first block) when `ORCH_ROLE=dev`; the issue-body BRIEF is protected by "only `board-gh` verbs mutate it" | ADVISORY + INSTRUCTED |
-| no Stop without a handoff | Stop hook: session marker present with a role, ≥1 `Edit\|Write` in the transcript since `startedAt`, and no `tmp/handoffs/M<n>.G<k>.S<j>-<role>.md` (ids from the marker) newer than `startedAt` → refuse once, name the file | ADVISORY (fail-open on missing marker) |
+| no Stop without a handoff | Stop hook: session marker present with a role, ≥1 `Edit\|Write` in the transcript since `startedAt`, and no handoff newer than `startedAt` at the marker's path — `M<n>.G<k>.S<j>-dev.md`, `M<n>.G<k>-architect.md`, or `M<n>-coordinator.md` by role → refuse once, name the file | ADVISORY (fail-open on missing marker) |
 | size budgets | Stop-time line counts: plan section ≤300 lines / ≤7 steps, handoff ≤40 | ADVISORY |
 | verdict grammar, ≤5 questions, recipe stage order | skill text; grammar test pins the strings | INSTRUCTED |
-| **review evidence** | evidence lint at `close-goal` (§5); at `done` once plan 4 adds the ship-gate matcher | **ENFORCED\*** (`close-goal`) · script-checked until then (`done`) |
+| **review evidence** | the §5 legs in `contract-ship-gate.js` at `board-gh close-goal` and `board-gh done` (plan 4) | **ENFORCED\*** once plan 4 ships; until then only today's ledger check exists |
 | ship rank, destructive git, protected dirs, read-before-write | unchanged from today | ENFORCED\* |
 
 A pane launched without a role, or with a wrong one, gets today's
 behavior plus at most a wrong advisory refusal; nothing security-relevant
 depends on the role. The direct-tool caveat applies to the hook rows;
 INSTRUCTED rows have no visibility at all, and the evidence lint reads
-repo state, not tool calls.
+repo state, not tool calls (its own caveat is the v2 one: a `board-gh`
+invocation the hook's matcher does not see — a wrapper script — bypasses
+it, exactly as for the ship gate).
 
 ## 7. Flow — one goal
 
@@ -239,12 +269,14 @@ repo state, not tool calls.
    check (`kill:` line); capacity check (fleet ceiling); pulse.
 3. **Shape, only if fuzzy or big**: Architect pane. Research route if a
    knowledge gap; ≤5 questions (pane blocks; answers → accepted ADRs);
-   plan section = `steps` (each `accept:` + `recipe:` from the *shaping*
-   or *execution* groups, §8) + `fog` (sharp-enough-to-name, not yet
-   ticketed); `add-item` per step; checkers as it likes; `orch review
-   G<k> --plan` → `R0`; fail → revise and re-run; pass → handoff, done.
-   Clear or debugging goal → the route phase writes `recipe:` and skips
-   this step. The route phase writes `ROUTE: … · base:<HEAD sha> · review:single|dual · …`.
+   plan section = `steps` (each `accept:` + an *execution* `recipe:`, §8)
+   + `fog` (sharp-enough-to-name, not yet ticketed); `add-item` per step;
+   checkers as it likes; `orch review G<k> --plan` → `P.R1` (range
+   `base..base`, no diff); fail → revise and re-run as `P.R2`; pass →
+   handoff, done. Clear or debugging goal → the goal skill already wrote
+   `recipe:` on `S1`; skip this step. The route phase then writes the
+   ROUTE line (`review:` recorded from the contract, `base:` copied from
+   the goal issue).
 4. **Dispatch** (d.29): if `workflow.dispatch: "confirm"` (default), the
    Coordinator asks the Director with a five-line proposal (goal/step ·
    role/tier/recipe · task line · touched domains and ship grant · caps)
@@ -266,19 +298,21 @@ repo state, not tool calls.
    → `attention` → Director.
 7. **Merge gate, once per goal**: ① full suite verdict line ② metric
    beats its noise band ③ root cause, no band-aid → GATE block in the
-   worklog (`subject:<sha> · regression · metric · rootcause`) → ship per
-   the contract's grant (`none` → hand the Director the command) →
-   `close-goal G<k> --evidence` (evidence lint + ledger check) → pane
-   torn down, roster cleared.
+   worklog (`subject:<last passing manifest's head-sha> · regression ·
+   metric · rootcause`), committed with the board/worklog as the evidence
+   commit → ship per the contract's grant (`none` → hand the Director the
+   command) → `close-goal G<k> --evidence` (ledger check today; the §5
+   lint after plan 4; **refused when the goal has no step** — every goal
+   has `S1`) → pane torn down, roster cleared.
 8. **Milestone**: when every goal under `M<n>` is merged the Coordinator
    writes a one-line summary against the milestone's `done:` into
    `tmp/handoffs/M<n>-coordinator.md`; `/orch:milestone close` shows it,
    asks for acknowledgement, and runs `close-milestone <n> --summary`,
    which appends `closed: <date> · summary: <line>` to the description and
    closes the Milestone. Refused when the milestone has zero goals, when
-   any goal is not merged, or when the board read window cannot prove
-   completeness (the verb counts the milestone's `orch:goal` issues via
-   REST and refuses if `read` returned fewer).
+   any goal is not merged, or when the REST count of the milestone's
+   `orch:goal` issues **differs** from what `read` returned (either
+   direction — window too small, or a concurrent move).
 
 Loop vehicle: `workflow.coordinator: "loop"` runs step 2 on every tick
 via `/loop <interval> /orch:go`; a `confirm`-mode question blocks the
@@ -302,8 +336,9 @@ hashes; it never changes hooks, the evidence lint, or the ship gate.
 | | `cleanup` | slop after a feature landed | separate pass, separate agent | tests unchanged and green; the diff deletes |
 | | `fast` | trivial, spec-complete | implement → test | mechanical step only |
 
-Routing: a fuzzy goal starts with a shaping recipe and its steps carry
-execution recipes; a goal may use several across its life. One page per
+Routing: shaping recipes belong to the Architect's pass (or the goal
+skill's research route) and never to a step; every step carries an
+execution recipe; a goal may use several across its life. One page per
 recipe in `skills/go/recipes/<name>.md`; a recipe needing more than a page
 is two recipes or a discipline that belongs downstream. Recipes are never
 commands (d.20).
@@ -349,11 +384,11 @@ not a skill — so that its brief assembly is code, not prose.
 
 | command | who | verbs / phases |
 |---|---|---|
-| `/orch:setup` | Director | contract, models, workflow, lock; runs `sync-features` after any domain change (the verb is also reachable from `/orch:board`) |
+| `/orch:setup` | Director | contract (incl. the per-domain `review: "dual"` flag), models, workflow, lock; runs `sync-features` after any domain change |
 | `/orch:milestone` | Director only — the skill refuses when `ORCH_ROLE` is set, and the verbs below refuse too (both ADVISORY; they exist so a roled pane cannot drift into scope; **replay of a pending Director-only action is likewise skipped and reported in a roled pane**) | `define` (three questions → `add-milestone`) · `split` (proposes goals from Feature options, creates nothing) · `prioritize` (`move G<n> <bucket>` on goals) · `close` (summary from `tmp/handoffs/M<n>-coordinator.md` shown, acknowledgement asked, `close-milestone --summary`) |
 | `/orch:goal` | Director; Coordinator proposes | shape (§8 shaping recipes) → BRIEF → `add-goal` (parses `feature:`) → `add-item` per step (`--accept`, `--recipe`) |
 | `/orch:go` | Coordinator (or today's single session) | route → work → ship; `loop` |
-| `/orch:board` | anyone | `init` (Project, labels, Feature seed) · read · `html` |
+| `/orch:board` | anyone | `init` (Project, labels, Feature seed) · `sync` (runs `sync-features`; the skill's read-only rule gains this second announced exception) · read · `html` |
 
 `board-gh` verbs added by plan 1: `add-milestone`, `close-milestone`,
 `sync-features`; `move` extended to goals (no separate `prioritize` verb).
@@ -365,8 +400,8 @@ pending, reports) any Director-only action when the pane is roled.
 
 1. Coordinator frontier first; `mid` after one clean milestone.
 2. One Coordinator per repo.
-3. Second reviewer family via `models.review-alt`.
-4. Reviews git-tracked, handoffs scratch.
+3. Second reviewer family via `models.review-alt`; dual is a locked contract flag per domain (`review: "dual"`), not a route choice *(r5)*.
+4. Reviews and worklogs git-tracked; handoffs scratch *(r5: worklog restored to git, as on main)*.
 5. Ids `M.G.S.R` with slot files `R<r>-<slot>` and the plan round `P.R<r>` *(r4: every goal has ≥1 step; `M` and `G` are GitHub numbers)*.
 6. Panes feed the v2 fleet roster.
 7. Goal is the unit of work; milestone is the GitHub Milestone; Architect goal-sized and optional. *(r3: "lane" retired as a word; nothing renames on the lane side — main already ships `G<n>`.)*
@@ -387,7 +422,7 @@ pending, reports) any Director-only action when the pane is roled.
 22. Pulse line per tick; stale = pulse age.
 23. No-progress detection, N = 2.
 24. Fresh Dev per step by default; resident across rounds 1–2.
-25. Milestones run concurrently; Coordinator singular; Priority wins across milestones.
+25. Milestones run concurrently; Coordinator singular; Priority wins across milestones; at most one running goal per domain *(r5)*.
 26. *(r3)* "Lane" retired from the vocabulary; domain = workstream, metadata not identity.
 27. *(r3)* Checker is a capability, not a role.
 28. *(r3)* Recipes grouped as shaping vs execution.
@@ -414,7 +449,18 @@ session marker + Stop rule · (4) `orch review` + manifests + evidence lint
 vehicles (loop, then herdr) + dispatch confirm.
 1 first; 2 ∥ 3; **4 after 2 and 3**; 5 after 3 + 4.
 
-r4 answers round 2: **Opus** S1–S3 (range rule, `step:` line, one
+r5 answers round 3: **Opus** S1 (worklog in git), S2 (close leg = GATE
+subject + empty domain diff), S3 (lint lives in the hook, plan 4; nothing
+enforced before), S4 (`R0` gone), S5 (plan round range `base..base`), S6
+(goal skill writes `recipe:` on `S1`), S7 (`paths:` + one running goal per
+domain), S8 (hashes at `head-sha`), S9 (`orch review` calls the verb),
+S10–S12; **Codex** 1–5 (same, plus `base:` in the goal issue and dual from
+the locked contract), majors (manifests committed by the script, chain =
+step manifests only; fail-count wording; close-milestone inequality),
+minors. The v2 spec's §3 line "Pipeline seeded from domains, Feature
+untouched" is superseded by §4 here; plan 1 edits that line.
+
+r4 answered round 2: **Opus** S1–S3 (range rule, `step:` line, one
 milestone number), S4–S8 (manifest slots, inconclusive exit, only-board-gh
 closes + `unverified`, plan order, pick rule 0), S9–S12; **Codex** 1–3
 (same three), 4 (`step:` stored), 5 (every goal ≥1 step), 6 (rounds
