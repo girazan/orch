@@ -1,7 +1,7 @@
 # Five-Role Orchestration on Herdr — Design Spec
 
-Date: 2026-09-05 · Status: **r6** — round-4 rework (Opus REWORK 2c/6M,
-Codex FAIL 3c/3M on r5; §13) · Baseline: `main` with
+Date: 2026-09-05 · Status: **r7** — round-5 rework (Codex FAIL 3c/3M on
+r6; Opus round 5 pending at the time of writing; §13) · Baseline: `main` with
 the GitHub board (`board-gh`), orch v0.7.0 + unreleased · Companion to
 `2026-08-31-orch-v2-upgrade-design.md`, whose **threat model and label
 vocabulary this spec inherits verbatim**: hooks defend against a sloppy
@@ -172,7 +172,10 @@ Rubrics live in the plugin (`skills/go/recipes/`), not in the repo under
 review, so the script copies each rubric it used to
 `docs/reviews/rubrics/<name>.<sha256>.md` — content-addressed, so a later
 rubric edit is a new file and old manifests keep resolving (Opus S1). A plan-round manifest (`…P.R<r>.md`) has `range: <base>..<base>`
-and no `paths:`; it reviews the plan section, not a diff.
+where `base` is the ROUTE line's `base:` — the ROUTE line is written at
+the goal's **first dispatch of any pane**, Architect included (§7 step
+2), so a plan round always has one (r7, Codex M2) — and no `paths:`; it
+reviews the plan section, not a diff.
 
 **Range rule (r6, computable from git alone):**
 - `<base-sha>` = the `head-sha` of the **latest passing step manifest of
@@ -203,32 +206,56 @@ and no `paths:`; it reviews the plan section, not a diff.
 rule; Codex 1, Opus S2). Inputs: the verb line (`board-gh done --goal
 G<n> --step S<j> <item#>` or `close-goal G<n>`), the manifests found by
 `docs/reviews/*.G<n>.S<j>.R*.md` (`*.G<n>.S*.R*.md` for close), the
-worklog at HEAD, the locked contract. Legs: (a) every `rubric:` entry
-`<name>@<h>` has `docs/reviews/rubrics/<name>.<h>.md` at HEAD whose
-sha256 is `<h>`; (b) `<head-sha>` is an ancestor of HEAD and `<base-sha>`
-an ancestor of `<head-sha>`; (c) `<base-sha>` equals the latest passing
-step manifest's `head-sha` for this goal, or the worklog ROUTE `base:` for
-the first; for `close-goal`, the latest passing manifest's `<head-sha>`
-equals the GATE block's `subject:` **and `git diff <head-sha>..HEAD --
-<paths>` is empty** (only evidence and other domains may follow — the v2
-two-commit protocol; holds on a shared HEAD); (d) **`paths:` equals** the
-union of locked contract paths of the domains touched by `git diff
-<base>..<head> --name-only` (evidence paths excluded) and **`slots:`
-equals** `2` iff any touched domain has `review: "dual"` in the locked
-contract (a new optional domain field beside `tiers`), else `1`; every
-slot line's file exists with matching `range:`/`paths:`, and the
-manifest's `verdict:` **equals the aggregate recomputed from the slot
-files' own `verdict:` lines** — a slot marked `missing`, or a slot file
-absent, aggregates to inconclusive (Codex 2); (e) that aggregate is
-`pass`. Any miss blocks the transition and names the leg. `goal:` /
-`step:` in the manifest must match the verb line (a manifest for another
-step is leg c's miss, not a hit).
+worklog at HEAD, the locked contract. The lint is one algorithm (r7 —
+written out so a reviewer can run it by hand):
+
+```
+CHAIN(G):  every docs/reviews/*.G<n>.S*.R*.md at HEAD whose verdict line
+           is `pass` (plan manifests excluded), ordered by ancestry of
+           head-sha (older = ancestor); two heads neither of which is an
+           ancestor of the other → MISS "branched history".
+           chain[0].base == ROUTE base:  and  chain[i].base == chain[i-1].head
+           → else MISS "chain".   (the target manifest is a member of the
+           chain like any other; nothing compares a manifest to itself)
+TARGET:    done  → the manifest named by the verb's --goal/--step whose R is
+           highest; its goal:/step:/item: lines must equal the verb's
+           G<n>, S<j> and <item#> — all three (Codex C2); it must be the
+           LAST element of CHAIN(G).
+           close-goal → the last element of CHAIN(G); its head must equal
+           the GATE block's subject:.
+LEGS on TARGET (and, for close-goal, on every chain member):
+ (a) each rubric: entry <name>@<h> → docs/reviews/rubrics/<name>.<h>.md
+     exists at HEAD and sha256 == <h>
+ (b) head is an ancestor of HEAD; base an ancestor of head
+ (c) CHAIN holds (above)
+ (d) touched := domains of the locked contract whose paths (minus the
+     evidence paths) match any file of `git diff base..head --name-only`;
+     paths: == sorted union of touched paths;  slots: == 2 iff any touched
+     domain has review:"dual" else 1;  every non-missing slot file exists
+     with the same range:/paths:;  verdict: == aggregate of the slot
+     files' verdict: lines (missing/absent slot → inconclusive)
+ (e) aggregate == pass
+CLOSE TAIL (close-goal only, Codex C3): U := union of paths: over every
+     chain member;  `git diff <last head>..HEAD --name-only`, evidence
+     paths removed, must contain no file matching U  (only evidence and
+     other goals' domains may follow — the v2 two-commit protocol; holds
+     on a shared HEAD)
+```
+
+Any miss blocks the transition and names the leg. `review: "dual"` is a
+new optional domain field beside `tiers`.
 
 **Where it runs and what that makes it (r6):** plan 4 puts these legs
 into `hooks/contract-ship-gate.js` beside the existing `close-goal`
 matcher (`:146`) and adds a `board-gh done --goal --step` matcher (a bare
 `done <item#>` is refused once plan 4 ships: the hook cannot map an item
-number to ids offline). From then on both transitions are **ENFORCED\***. Until plan 4 ships, today's hook checks
+number to ids offline). From then on both transitions are **ENFORCED\***.
+The lint adds no network call. Main's ship gate already has exactly one
+(`git ls-remote --symref origin HEAD`, `hooks/contract-ship-gate.js:280`,
+the push-base fallback when `origin/HEAD` was never set locally); the v2
+rule is "a gate never fetches", and plan 4 tightens it to "never talks to
+the remote": that fallback becomes a refusal naming `git remote set-head
+origin -a` (Codex M3). Until plan 4 ships, today's hook checks
 only the ledger line at HEAD, and no manifest exists — nothing in this
 section is enforced yet, and no revision of this spec claims otherwise.
 A forged manifest that satisfies all five legs is a *correct* manifest
@@ -259,9 +286,13 @@ Rules, all INSTRUCTED unless noted:
   refused.
 - **Evidence-only commits are a ship-gate grant, not an assumption.** Plan
   4 adds a built-in `commit` grant for the three evidence paths (above),
-  matched before domains; the script's manifest commit and §7's GATE
-  commit depend on it, and until plan 4 ships both are done by the
-  Director's hand (Opus S5).
+  matched before domains. It governs the commits the hook sees — the
+  Coordinator's typed GATE/worklog commit, a Dev committing its worklog
+  ledger. The script's own manifest commit is `child_process`, unseen by
+  any hook (v2 caveat): its limit is **code** — the script commits with
+  the pathspec `-- docs/reviews` and nothing else — so it is
+  script-enforced, not ENFORCED\* (Codex M1). Until plan 4 ships the
+  typed commits are done by the Director's hand (Opus S5).
 - **Fix rounds** (Coordinator counts **`fail` manifests** for the step,
   not `R` numbers): fails 1–2 resume the same Dev pane with the manifest
   **plus the failing test output and any conflict context** (Ralphinho:
@@ -291,7 +322,7 @@ calls. Every row below is **ADVISORY** except the last two.
 | size budgets | Stop-time line counts: plan section ≤300 lines / ≤7 steps, handoff ≤40 | ADVISORY |
 | verdict grammar, ≤5 questions, recipe stage order | skill text; grammar test pins the strings | INSTRUCTED |
 | **review evidence** | the §5 legs in `contract-ship-gate.js` at `board-gh close-goal` and `board-gh done --goal --step` (plan 4); git + lock only | **ENFORCED\*** once plan 4 ships; until then only today's ledger check exists |
-| evidence paths commit | built-in `commit` grant for `docs/reviews/**`, `tmp/worklogs/**`, `docs/adr/**` in the ship gate (plan 4) | **ENFORCED\*** once plan 4 ships; today those commits are BLOCKED unless a domain grants them |
+| evidence paths commit | built-in `commit` grant for `docs/reviews/**`, `tmp/worklogs/**`, `docs/adr/**` in the ship gate (plan 4) | **ENFORCED\*** for typed commits once plan 4 ships (today BLOCKED unless a domain grants them); the script's own manifest commit is unseen — pathspec-limited in code |
 | ship rank, destructive git, protected dirs, read-before-write | unchanged from today | ENFORCED\* |
 
 A pane launched without a role, or with a wrong one, gets today's
@@ -310,7 +341,12 @@ it, exactly as for the ship gate).
    registers the issue under a milestone, and **always creates at least
    one step** — for a small goal, the single `gate:` step `S1`.
 2. **Coordinator** (per tick): read; pick the goal by §4's rule; kill
-   check (`kill:` line); capacity check (fleet ceiling); pulse.
+   check (`kill:` line); capacity check (fleet ceiling); pulse. **On the
+   goal's first pick** — before any pane, Architect or Dev — the route
+   phase writes the ROUTE line (`base:` = HEAD now, `review:` from the
+   contract, tier/decide/ship from the contract) and commits the worklog
+   (evidence path). Every later manifest of the goal, plan rounds
+   included, chains from this `base:` (r7).
 3. **Shape, only if fuzzy or big**: Architect pane. Research route if a
    knowledge gap; ≤5 questions (pane blocks; answers → accepted ADRs);
    plan section = `steps` (each `accept:` + an *execution* `recipe:`, §8)
@@ -318,9 +354,8 @@ it, exactly as for the ship gate).
    checkers as it likes; `orch review G<k> --plan` → `P.R1` (range
    `base..base`, no diff); fail → revise and re-run as `P.R2`; pass →
    handoff, done. Clear or debugging goal → the goal skill already wrote
-   `recipe:` on `S1`; skip this step. The route phase then writes the
-   ROUTE line (`review:` recorded from the contract, `base:` = HEAD at
-   this first dispatch, r6) and commits the worklog (evidence path).
+   `recipe:` on `S1`; skip this step. (The ROUTE line already exists from
+   step 2; shaping only fills the plan section.)
 4. **Dispatch** (d.29): if `workflow.dispatch: "confirm"` (default), the
    Coordinator asks the Director with a five-line proposal (goal/step ·
    role/tier/recipe · task line · touched domains and ship grant · caps)
@@ -474,7 +509,7 @@ pending, reports) any Director-only action when the pane is roled.
 27. *(r3)* Checker is a capability, not a role.
 28. *(r3)* Recipes grouped as shaping vs execution.
 29. *(r3)* Dispatch confirmation mode `workflow.dispatch: confirm|auto`, default `confirm`, five-line proposal via AskUserQuestion; `auto` logs the same lines.
-30. *(r6)* The evidence lint is git-only: manifests are self-sufficient (`goal:`/`step:`/`item:` lines, content-addressed rubric copies under `docs/reviews/rubrics/`), `base:` lives in the worklog ROUTE line at first dispatch, and evidence paths carry a built-in ship-gate commit grant.
+30. *(r6)* The evidence lint is git-only: manifests are self-sufficient (`goal:`/`step:`/`item:` lines, content-addressed rubric copies under `docs/reviews/rubrics/`), `base:` lives in the worklog ROUTE line, written at the goal's first dispatch of any pane, and evidence paths carry a built-in ship-gate commit grant for typed commits. *(r7: the lint is the one algorithm in §5 — chain, target, legs, close tail.)*
 
 ## 12. What would prove this is right
 
@@ -497,6 +532,13 @@ session marker + Stop rule · (4) `orch review` + manifests + evidence lint
 commit grant + `done --goal --step` · (5) coordinator vehicles (loop, then
 herdr) + dispatch confirm.
 1 first; 2 ∥ 3; **4 after 2 and 3**; 5 after 3 + 4.
+
+r7 answers round 5 (Codex; Opus pending): C1 (the target is a chain
+member, nothing compares a manifest to itself), C2 (`item:` bound to the
+verb), C3 (close tail over the union of chain paths), M1 (script commit
+is code-limited, not ENFORCED\*), M2 (ROUTE line at first dispatch of
+any pane, so plan rounds have a base), M3 (main's `ls-remote` named;
+plan 4 turns it into a refusal). Plan findings → plan r6.
 
 r6 answers round 4: **Opus** S1 (rubric copies, content-addressed), S2
 (git-only lint; `done --goal --step`; `goal:`/`step:`/`item:` in the
