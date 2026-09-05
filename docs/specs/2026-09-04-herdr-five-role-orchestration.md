@@ -406,11 +406,12 @@ decide d.1 and d.29's defaults, and tell whether seven recipes is right.
 
 ## 13. Delivery and review provenance
 
-Plans on `main`: (1) milestone + vocabulary (incl. `step:` ids, `base:`
-in ROUTE, `unverified` flag) · (2) recipes + skill routing (the rubric
-files the lint hashes) · (3) role guardrails (ADVISORY) + session marker +
-Stop rule · (4) `orch review` + manifests + evidence lint + worktree
-allowlist · (5) coordinator vehicles (loop, then herdr) + dispatch confirm.
+Plans on `main`: (1) milestone + vocabulary (incl. `step:` ids, `base:` and
+`review:` in ROUTE, journaled `sync-features`) · (2) recipes + skill routing
+(the rubric files the lint hashes) · (3) role guardrails (ADVISORY) +
+session marker + Stop rule · (4) `orch review` + manifests + evidence lint
++ the `unverified` flag on `read` + worktree allowlist · (5) coordinator
+vehicles (loop, then herdr) + dispatch confirm.
 1 first; 2 ∥ 3; **4 after 2 and 3**; 5 after 3 + 4.
 
 r4 answers round 2: **Opus** S1–S3 (range rule, `step:` line, one
